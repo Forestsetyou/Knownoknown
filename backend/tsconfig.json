@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "module": "ES2022",
+    "target": "ES2020",
+
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    
+    "forceConsistentCasingInFileNames": true,
+    // 启用装饰器
+    "experimentalDecorators": true,
+    // 启用装饰器元数据
+    "emitDecoratorMetadata": true,
+    
+    // "strict": true
+    "lib": ["dom", "esnext"],
+    "strictPropertyInitialization": false, // to enable generic constructors, e.g. on CircuitValue
+    "esModuleInterop": true,
+    "declaration": true,
+    "sourceMap": true,
+    "noFallthroughCasesInSwitch": true,
+    "useDefineForClassFields": false,
+  },
+
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+} 
