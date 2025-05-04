@@ -1,5 +1,3 @@
-import { createContext } from 'react';
-
 enum BackendServerStatus {
     ONLINE = "online",
     OFFLINE = "offline",
@@ -63,28 +61,28 @@ class LocalBackendService {
 
   async getBackendStatus() {
     const checkResult = await this.checkBackendStatus();
+    let backendServiceStatus: BackendServiceStatus;
     if (checkResult) {
-        return {
+        backendServiceStatus = {
             status: this.status,
             knownoknownEntryCID: this.knownoknownEntryCID,
             contractAddress: this.contractAddress,
             ipfsGatewayRoutingURL: this.ipfsGatewayRoutingURL,
             ipfsStatusFlagCID: this.ipfsStatusFlagCID,
         }
+        return backendServiceStatus;
     } else {
-        const errorBackendServiceStatus = {
+        backendServiceStatus = {
             status: BackendServerStatus.OFFLINE,
             knownoknownEntryCID: this.knownoknownEntryCID,
             contractAddress: this.contractAddress,
             ipfsGatewayRoutingURL: this.ipfsGatewayRoutingURL,
             ipfsStatusFlagCID: this.ipfsStatusFlagCID,
         }
-        return errorBackendServiceStatus;
+        return backendServiceStatus;
     }
   }
 }
 
-const BackendContext = createContext<LocalBackendService | undefined>(undefined);
-
-export { LocalBackendService, BackendContext, BackendServerStatus };
+export { LocalBackendService, BackendServerStatus };
 export type { BackendServiceStatus };

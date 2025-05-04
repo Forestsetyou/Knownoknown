@@ -1,4 +1,3 @@
-import { createContext } from 'react';
 import { PrivateKey } from 'knownoknown-contract';
 
 interface WalletStatus {
@@ -143,7 +142,5 @@ class LocalWalletService {
   }
 }
 
-const WalletContext = createContext<LocalWalletService | undefined>(undefined);
-
-export { LocalWalletService, WalletContext };
+export { LocalWalletService };
 export type { WalletStatus };

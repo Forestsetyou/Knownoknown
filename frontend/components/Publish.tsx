@@ -3,48 +3,58 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Container, Tabs, Tab, Card, Button, Spinner, Alert } from 'react-bootstrap';
 import { FaFileImport, FaFileExport, FaArrowRight, FaArrowLeft, FaWallet, FaExclamationTriangle } from 'react-icons/fa';
-import { IpfsServiceContext } from '@/service/ipfsService';
-import { WalletContext, WalletStatus } from '@/service/walletService';
 import PublishMetadata from '@/components/publish/PublishMetadata';
 import PublishChapters from '@/components/publish/PublishChapters';
 import PublishIntro from '@/components/publish/PublishIntro';
 import PublishReport from '@/components/publish/PublishReport';
-
+import { WalletStatus, useWallet } from '@/context/WalletContext';
+import { useIpfs } from '@/context/IpfsContext';
 export default function PublishPage() {
   // 当前活动的标签页
   const [activeTab, setActiveTab] = useState('basic-info');
   
   // IPFS服务
-  const ipfsService = useContext(IpfsServiceContext);
+  const { ipfsStatus, getIpfsStatus, ipfsCreateNewKnowledge, ipfsGetKnowledgeMetadata, ipfsSetKnowledgeMetadata } = useIpfs();
   
   // 钱包服务
-  const walletService = useContext(WalletContext);
+  const { walletStatus, connectWallet, disconnectWallet, validateWalletPrivateKey, setWalletKey } = useWallet();
+  const [localWalletStatus, setLocalWalletStatus] = useState<WalletStatus>(walletStatus);
   
   // 页面加载状态
+  const [walletConnected, setWalletConnected] = useState(walletStatus.connected);
   const [pageLoading, setPageLoading] = useState(true);
   
   const initializeNewKnowledge = async () => {
     setPageLoading(true);
-    // 检查钱包状态
-    if (!walletService) {
-      throw new Error('钱包服务未初始化');
-    }
     // 只有在钱包已连接的情况下才初始化
-    if (ipfsService && walletService.hasWalletConnected()) {
+    if (walletConnected) {
       try {
-        await ipfsService.waitUntilInitialized();
-        await ipfsService.createNewKnowledge(walletService.getWalletAddress()!);
+        await ipfsCreateNewKnowledge(localWalletStatus.address);
+        setPageLoading(false);
       } catch (error) {
         console.error('初始化新知识失败:', error);
       }
     }
-    setPageLoading(false);
   };
   
   // 初始化新知识
   useEffect(() => {
     initializeNewKnowledge();
-  }, []);
+  }, [walletConnected]);
+
+  const syncWalletStatus = async () => {
+    setLocalWalletStatus(prev => ({
+      ...prev,
+      ...walletStatus!,
+    }));
+  }
+  // 同步钱包状态
+  useEffect(() => {
+    syncWalletStatus();
+    if (walletConnected !== walletStatus.connected) {
+      setWalletConnected(walletStatus.connected);
+    }
+  }, [walletStatus]);
   
   // 处理页面刷新
   const handleRefreshPage = () => {
@@ -91,13 +101,11 @@ export default function PublishPage() {
   
   // 处理完成发布
   const handleFinishPublish = async () => {
-    if (ipfsService) {
-      try {
-        // 这里添加发布逻辑
-        console.log('完成发布');
-      } catch (error) {
-        console.error('发布失败:', error);
-      }
+    try {
+      // 这里添加发布逻辑
+      console.log('完成发布');
+    } catch (error) {
+      console.error('发布失败:', error);
     }
   };
   
@@ -111,21 +119,8 @@ export default function PublishPage() {
     '--bs-nav-tabs-border-color': '#dee2e6',
   } as React.CSSProperties;
   
-  // 如果页面正在加载，显示加载状态
-  if (pageLoading) {
-    return (
-      <Container className="py-5">
-        <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '60vh' }}>
-          <Spinner animation="border" variant="danger" className="mb-3" style={{ width: '3rem', height: '3rem' }} />
-          <h5 className="text-muted mb-2">正在初始化知识发布环境</h5>
-          <p className="text-muted">请稍候...</p>
-        </div>
-      </Container>
-    );
-  }
-  
   // 如果钱包未连接，显示连接提示
-  if (!(walletService?.hasWalletConnected())) {
+  if (!walletConnected) {
     return (
       <Container className="py-5">
         <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '60vh' }}>
@@ -142,15 +137,19 @@ export default function PublishPage() {
               </ul>
             </Alert>
           </div>
-          <div className="d-flex gap-3">
-            <Button 
-              variant="outline-secondary" 
-              size="lg" 
-              onClick={handleRefreshPage}
-            >
-              刷新页面
-            </Button>
-          </div>
+        </div>
+      </Container>
+    );
+  }
+  
+  // 如果页面正在加载，显示加载状态
+  if (pageLoading) {
+    return (
+      <Container className="py-5">
+        <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '60vh' }}>
+          <Spinner animation="border" variant="danger" className="mb-3" style={{ width: '3rem', height: '3rem' }} />
+          <h5 className="text-muted mb-2">正在初始化知识发布环境</h5>
+          <p className="text-muted">请稍候...</p>
         </div>
       </Container>
     );

@@ -13,6 +13,13 @@ class KnownoknownDagManagerClient {
         this.helia = helia;
     }
 
+    async reset() {
+        if (this.knownoknown_entry_cid) {
+            await this.pinRm(this.knownoknown_entry_cid);
+        }
+        this.knownoknown_entry_cid = undefined;
+    }
+
     async pinAdd(cid: CID, option: AddOptions = {}) {
         const pinOption = { // 添加定时
             ...option,

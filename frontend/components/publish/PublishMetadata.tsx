@@ -3,11 +3,11 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { Form, Row, Col, Button, Toast, ToastContainer, Spinner } from 'react-bootstrap';
 import { FaSave, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
-import { IpfsServiceContext } from '@/service/ipfsService';
+import { useIpfs, IpfsServerStatus } from '@/context/IpfsContext';  
 
 export default function PublishMetadata() {
   // IPFS服务
-  const ipfsService = useContext(IpfsServiceContext);
+  const { ipfsStatus, getIpfsStatus, ipfsGetKnowledgeMetadata, ipfsSetKnowledgeMetadata } = useIpfs();
   
   // 基本信息表单状态
   const [basicInfo, setBasicInfo] = useState({
@@ -42,10 +42,10 @@ export default function PublishMetadata() {
   // 组件加载时获取元数据
   useEffect(() => {
     const fetchMetadata = async () => {
-      if (ipfsService) {
+      if (ipfsStatus.status === IpfsServerStatus.ONLINE) {
         try {
           setLoading(true);
-          const metadata:any = await ipfsService.getKnowledgeMetadata();
+          const metadata:any = await ipfsGetKnowledgeMetadata();
           console.log('获取到元数据:', metadata);
           
           if (metadata) {
@@ -138,7 +138,7 @@ export default function PublishMetadata() {
     
     try {
       // 这里添加保存元数据的逻辑
-      if (ipfsService) {
+      if (ipfsStatus.status === IpfsServerStatus.ONLINE) {
         const metadata = {
           title: basicInfo.title,
           price: basicInfo.price,
@@ -146,7 +146,7 @@ export default function PublishMetadata() {
         }
         console.log('保存元数据:', metadata);
         
-        await ipfsService.setKnowledgeMetadata(metadata);
+        await ipfsSetKnowledgeMetadata(metadata);
         
         // 设置保存成功状态
         setSaveStatus({

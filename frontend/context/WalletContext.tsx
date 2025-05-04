@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { WalletStatus, LocalWalletService } from '@/service/walletService'
-import { Container, Alert } from 'react-bootstrap';
+import { Container, Alert, Spinner } from 'react-bootstrap';
 import { StatusChecker } from "@/interface/utilTypes";
 
 interface WalletContextType {
@@ -8,13 +8,13 @@ interface WalletContextType {
     connectWallet: () => Promise<boolean>;
     disconnectWallet: () => Promise<boolean>;
     getWalletBalance: () => Promise<number>;
-    validatePrivateKey: (keyValue: string) => Promise<boolean>;
-    setKey: (keyValue: string) => Promise<boolean>;
+    validateWalletPrivateKey: (keyValue: string) => Promise<boolean>;
+    setWalletKey: (keyValue: string) => Promise<boolean>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
-const defaultWalletState : WalletStatus = {
+const defaultWalletStatus : WalletStatus = {
     connected: false,
     connecting: false,
     address: '',
@@ -24,7 +24,7 @@ const defaultWalletState : WalletStatus = {
 
 
 const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
-    const [walletStatus, setWalletStatus] = useState<WalletStatus>(defaultWalletState);
+    const [walletStatus, setWalletStatus] = useState<WalletStatus>(defaultWalletStatus);
     const [localWalletService, setLocalWalletService] = useState<LocalWalletService>(new LocalWalletService());
   
     // for initialization
@@ -49,61 +49,45 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     // 如果系统尚未初始化，显示加载中
     if (!initialized) {
       return (
-        <html lang="zh">
-          <head>
-            <link
-              rel="stylesheet"
-              href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-              integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
-              crossOrigin="anonymous"
-              referrerPolicy="no-referrer"
-            />
-          </head>
-          <body>
-            <Container className="d-flex align-items-center justify-content-center" style={{ height: "100vh" }}>
-              <div className="text-center">
-                <h2>KnowNoKnown</h2>
-                <p>基于Mina Protocol的知识付费平台</p>
-                
-                {initError ? (
-                  <Alert variant="danger" className="mt-3">
-                    <Alert.Heading>初始化错误</Alert.Heading>
-                    <p>{initError}</p>
-                    <p className="mb-0">
-                      这可能是由于浏览器不支持某些功能所致。请检查控制台获取更多信息。
-                    </p>
-                    <button 
-                      className="btn btn-outline-danger mt-3" 
-                      onClick={()=>{}}
-                    >
-                      重试初始化
-                    </button>
-                  </Alert>
-                ) : (
-                  <>
-                    <div className="spinner-border" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                    <p className="mt-3">{initializationStatus}</p>
-                  </>
-                )}
-              </div>
-            </Container>
-          </body>
-        </html>
+        <Container className="d-flex align-items-center justify-content-center" style={{ minHeight: "50vh" }}>
+          <div className="text-center">
+            <h4>钱包服务</h4>
+            
+            {initError ? (
+              <Alert variant="danger" className="mt-3">
+                <Alert.Heading>初始化错误</Alert.Heading>
+                <p>{initError}</p>
+                <p className="mb-0">
+                  这可能是由于浏览器不支持某些功能所致。请检查控制台获取更多信息。
+                </p>
+                <button 
+                  className="btn btn-outline-danger mt-3" 
+                  onClick={() => {}}
+                >
+                  重试初始化
+                </button>
+              </Alert>
+            ) : (
+              <>
+                <Spinner animation="border" variant="danger" className="my-3" />
+                <p>{initializationStatus}</p>
+              </>
+            )}
+          </div>
+        </Container>
       );
     }
     
     const connectWallet = async () => {
         try {
-            setWalletStatus(prev => ({
+            setWalletStatus((prev:WalletStatus) => ({
                 ...prev,
                 connecting: true,
             }));
             
             if (await localWalletService.connectWallet()) {
                 const balance = Number(await localWalletService.getWalletBalance() as unknown as string)/1e9;
-                setWalletStatus(prev => ({
+                setWalletStatus((prev:WalletStatus) => ({
                     ...prev,
                     connected: true,
                     connecting: false,
@@ -114,7 +98,7 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                 walletBalanceChecker = setInterval(getWalletBalance, 120000); // 120秒更新一次钱包余额
                 return true
             } else {
-                setWalletStatus(prev => ({
+                setWalletStatus((prev:WalletStatus) => ({
                     ...prev,
                     ...walletStatus!,
                     connecting: false
@@ -122,7 +106,7 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                 return false
             }
         } catch (error) {
-            setWalletStatus(prev => ({
+            setWalletStatus((prev:WalletStatus) => ({
                 ...prev,
                 connecting: false
             }));
@@ -133,7 +117,7 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const disconnectWallet = async () => {
         try {
             localWalletService.disconnectWallet();
-            setWalletStatus(prev => ({
+            setWalletStatus((prev:WalletStatus) => ({
                 ...prev,
                 connected: false,
             }));
@@ -149,7 +133,7 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
     const getWalletBalance = async () => {
       const balance = Number(await localWalletService.getWalletBalance() as unknown as string)/1e9;
-      setWalletStatus(prev => ({
+      setWalletStatus((prev:WalletStatus) => ({
         ...prev,
         balance: `${balance}`,
       }));
@@ -165,10 +149,10 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           localWalletService.setWalletKey(keyValue);
 
           // 更新钱包状态，添加密钥
-          setWalletStatus({
-          ...walletStatus!,
-          key: keyValue
-          });
+          setWalletStatus((prev:WalletStatus) => ({
+            ...prev,
+            key: keyValue
+          }));
           return true;
         } catch (error) {
           throw error;
@@ -182,8 +166,8 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           connectWallet, 
           disconnectWallet, 
           getWalletBalance, 
-          validatePrivateKey, 
-          setKey, 
+          validateWalletPrivateKey: validatePrivateKey, 
+          setWalletKey: setKey, 
         }}
       >
         {children}
@@ -200,5 +184,5 @@ const useWallet = () => {
   return context;
 }; 
 
-export { WalletContext, WalletProvider, useWallet }
-export type { WalletContextType }
+export { WalletProvider, useWallet }
+export type { WalletContextType, WalletStatus }

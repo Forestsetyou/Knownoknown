@@ -26,6 +26,9 @@ enum IpfsServerStatus {
 
 interface IpfsServiceStatus {
     status: IpfsServerStatus;
+    httpGatewayRoutingURL: string;
+    statusFlagCID: string;
+    knownoknownEntryCID: string;
 }
 
 class IpfsService {
@@ -39,11 +42,7 @@ class IpfsService {
     private knownoknownDagManager: KnownoknownDagManagerClient;
     private knowledgeCheckPackManager: KnowledgeCheckPackManagerClient;
 
-    private initialized: boolean;
-
-    constructor() {
-        this.initialized = false;
-    }
+    constructor() {}
 
     async initialize(init: IpfsServiceInit) {
         this.httpGatewayRoutingURL = init.httpGatewayRoutingURL;
@@ -62,17 +61,19 @@ class IpfsService {
         await this.dagCborGet(knownoknownEntryCID);
         await this.knownoknownDagManager.setKnownoknownEntry(knownoknownEntryCID);
         this.helia.gc()
-        this.initialized = true;
     }
 
-    async waitUntilInitialized() {
-        while (!this.initialized) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+    async resetKnownoknownDag(knownoknownEntryCIDStr: string) {
+        this.knownoknownDagManager.reset();
+        const knownoknownEntryCID = CID.parse(knownoknownEntryCIDStr);
+        await this.dagCborGet(knownoknownEntryCID);
+        this.knownoknownDagManager.setKnownoknownEntry(knownoknownEntryCID);
+        this.helia.gc()
     }
 
     async getStatus() {
         const url = this.httpGatewayRoutingURL + '/ipfs/' + this.statusFlagCID;
+        let ipfsServiceStatus: IpfsServiceStatus;
         try {
             const response = await fetch(url, {
                 method: 'GET',
@@ -82,17 +83,29 @@ class IpfsService {
                 signal: AbortSignal.timeout(TIMEOUT),
             });
             if (response.status !== 200) {
-                return {
+                ipfsServiceStatus = {
                     status: IpfsServerStatus.OFFLINE,
+                    httpGatewayRoutingURL: this.httpGatewayRoutingURL,
+                    statusFlagCID: this.statusFlagCID,
+                    knownoknownEntryCID: this.knownoknownDagManager.getKnownoknownEntryCID()!.toString(),
                 }
+                return ipfsServiceStatus;
             }
-            return {
+            ipfsServiceStatus = {
                 status: IpfsServerStatus.ONLINE,
+                httpGatewayRoutingURL: this.httpGatewayRoutingURL,
+                statusFlagCID: this.statusFlagCID,
+                knownoknownEntryCID: this.knownoknownDagManager.getKnownoknownEntryCID()!.toString(),
             }
+            return ipfsServiceStatus;
         } catch (error) {
-            return {
+            ipfsServiceStatus = {
                 status: IpfsServerStatus.OFFLINE,
+                httpGatewayRoutingURL: this.httpGatewayRoutingURL,
+                statusFlagCID: this.statusFlagCID,
+                knownoknownEntryCID: this.knownoknownDagManager.getKnownoknownEntryCID()!.toString(),
             }
+            return ipfsServiceStatus;
         }
     }
 
@@ -121,14 +134,12 @@ class IpfsService {
     }
 
     async getKnowledgeMetadata() {
-        return await this.dagCbor.get((await this.knowledgeCheckPackManager.getKnowledgeMetadata())!);
+        const knowledgeMetadataCID = await this.knowledgeCheckPackManager.getKnowledgeMetadata();
+        return await this.dagCbor.get(knowledgeMetadataCID!);
     }
 
     // 以下是合约电路需要的方法
     async generateDAGCidArray(type: 'knowledge' | 'application'): Promise<Array<DAGCid>> {
-        if (!this.initialized) {
-            throw new Error('IpfsService not initialized');
-        }
         const knownoknownEntryCID = this.knownoknownDagManager.getKnownoknownEntryCID()!;
         const knownoknownEntry: Knownoknown_Entry = await this.dagCbor.get(knownoknownEntryCID);
         switch (type) {
@@ -165,7 +176,5 @@ class IpfsService {
     }
 }
 
-const IpfsServiceContext = createContext<IpfsService | undefined>(undefined);
-
-export { IpfsService, IpfsServiceContext, IpfsServerStatus };
+export { IpfsService, IpfsServerStatus };
 export type { IpfsServiceStatus, IpfsServiceInit };

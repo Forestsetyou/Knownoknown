@@ -1,16 +1,16 @@
 'use client';
 
 import "../styles/globals.css"
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Container, Row, Col, Alert } from 'react-bootstrap';
-import { LocalZkappService, ZkappContext } from "@/service/contractService";
-import { LocalWalletService, WalletContext } from "@/service/walletService";
 import { ModalProvider } from '@/context/ModalContext';
-import { LocalBackendService, BackendContext } from "@/service/backendService";
-import { IpfsService, IpfsServiceContext } from "@/service/ipfsService";
 import { RouterProvider } from '@/context/RouterContext';
+import { WalletProvider } from '@/context/WalletContext';
+import { BackendProvider } from '@/context/BackendContext';
+import { IpfsProvider } from '@/context/IpfsContext';
+import { ZkappProvider } from '@/context/ZkappContext';
 
 // 动态导入顶部横栏组件
 const TopBar = dynamic(() => import('@/components/TopBar'), {
@@ -27,11 +27,6 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [globalZkapp, setGlobalZkapp] = useState<LocalZkappService | undefined>(undefined);
-  const [globalWallet, setGlobalWallet] = useState<LocalWalletService | undefined>(undefined);
-  const [globalBackend, setGlobalBackend] = useState<LocalBackendService | undefined>(undefined);
-  const [globalIpfsService, setGlobalIpfsService] = useState<IpfsService | undefined>(undefined);
-
   // for initialization
   const [initialized, setInitialized] = useState(false);
   const [initializationStatus, setInitializationStatus] = useState('');
@@ -39,41 +34,7 @@ export default function RootLayout({
   
   // 初始化系统
   useEffect(() => {
-    const initContract = async () => {
-      const zkapp = new LocalZkappService();
-      setGlobalZkapp(zkapp);
-      setInitializationStatus("Loading web worker")
-      // await new Promise((resolve) => setTimeout(resolve, 5000));
-      await zkapp.initThread();
-      console.log("contract thread init done");
-    }
-    const initWallet = async () => {
-      const wallet = new LocalWalletService();
-      setGlobalWallet(wallet);
-    }
-    const initBackend = async () => {
-      const backend = new LocalBackendService();
-      setGlobalBackend(backend);
-    }
-    const initIpfsService = async () => {
-      const ipfsService = new IpfsService();
-      setGlobalIpfsService(ipfsService);
-    }
-    const appInit = async () => {
-      try {
-        await initContract();
-        await initWallet();
-        await initBackend();
-        await initIpfsService();
-        setInitialized(true);
-      } catch (error) {
-        console.log(error)
-        setInitError(error as string)
-      }
-    }
-    if (!initialized) {
-      appInit();
-    }
+    setInitialized(true);
   }, []);
   
   // 如果系统尚未初始化，显示加载中
@@ -145,10 +106,10 @@ export default function RootLayout({
                 id="app-sidebar-navigation">
                   <SideNav />
                 </Col>
-                <WalletContext.Provider value={globalWallet}>
-                  <BackendContext.Provider value={globalBackend}>
-                    <IpfsServiceContext.Provider value={globalIpfsService}>
-                      <ZkappContext.Provider value={globalZkapp}>
+                <WalletProvider>
+                  <BackendProvider>
+                    <IpfsProvider>
+                      <ZkappProvider>
                         {/* 右侧内容区域 */}
                         <Col md={12} className="ms-md-1 h-100 overflow-auto">
                         <div id="main-content-wrapper">
@@ -158,10 +119,10 @@ export default function RootLayout({
                           </div>
                         </div>
                         </Col>
-                      </ZkappContext.Provider>
-                    </IpfsServiceContext.Provider>
-                  </BackendContext.Provider>
-                </WalletContext.Provider>
+                      </ZkappProvider>
+                    </IpfsProvider>
+                  </BackendProvider>
+                </WalletProvider>
               </Row>
             </Container>
           </RouterProvider>
