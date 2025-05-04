@@ -114,6 +114,19 @@ class DAGProver extends Struct({
         return proverMerkleTree.getRoot();
     }
 
+    static calculateMerkleRoot(dagCidArray: DAGCid[]): Field {
+        const dagNum = dagCidArray.length;
+        const proverMerkleTree = new MerkleTree(DagMerkleDepth);
+        for (let i = 0; i < dagNum; i++) {
+            proverMerkleTree.setLeaf(BigInt(i), dagCidArray[i].toHash());
+        }
+        for (let i = dagNum; i < DagMerkleDepth; i++) {
+            proverMerkleTree.setLeaf(BigInt(i), DAGCid.empty().toHash());
+        }
+        const proverMerkleRoot = proverMerkleTree.getRoot();
+        return proverMerkleRoot;
+    }
+
     static structProver(dagCidArray: DAGCid[], dagIndex: number, dagAfter: DAGCid) {
         const dagNum = dagCidArray.length;
         const proverMerkleTree = new MerkleTree(DagMerkleDepth);

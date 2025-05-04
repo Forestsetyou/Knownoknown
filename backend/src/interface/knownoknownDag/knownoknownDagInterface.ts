@@ -7,8 +7,9 @@ type Application_ID = number;
 type Comment_ID = number;
 type Transaction_Hash = CID_Str;
 
-
-type Knowledge_List_Entry = Array<CID>; // cid-> Knowledge_Entry
+interface Knowledge_List_Entry {
+    knowledge_entry_list: Array<CID>, // cid-> Knowledge_Entry
+};
 
 interface Knownoknown_Metadata {	// 平台 metadata
 	knowledge_num: number,	// 已创作且记录的知识实体的数量
@@ -71,7 +72,9 @@ type Application_Claim_Income_Record = {
     data: Application_Claim_Income_Record_data,
 }
 
-type Application_Entry = Array<CID>;    // cid-> Application_Claim_Income_Record | Application_Buy_Knowledge_Record
+interface Application_Entry {
+    application_list: Array<CID>, // cid-> Application_Claim_Income_Record | Application_Buy_Knowledge_Record
+};
 
 interface Comment_Record {	// comment_record
     comment_id: Comment_ID,	// 评论的id, 即comment在comment_entry中的位序
@@ -80,7 +83,9 @@ interface Comment_Record {	// comment_record
     comment_text: string,	// 评论内容
 }
 
-type Comment_Entry = Array<Comment_Record>;
+interface Comment_Entry {
+    comment_list: Array<CID>, // cid-> Comment_Record
+};
 
 // [	// knowledge_comment_index_entry
 //     [	// 对应于public_order=0的knowledge的comment的伪索引
@@ -90,9 +95,13 @@ type Comment_Entry = Array<Comment_Record>;
 //     [],	// 表示id=1的knowledge无评论
 //     ...
 // ]
-type Knowledge_Comment_Index_Entry = Array<Array<CID_Str>>; // cid->comment_record
+interface Knowledge_Comment_Index_Entry {
+    knowledge_comment_index_list: Array<Array<CID_Str>> // cid->comment_record
+};
 
-type Star_Enrty = Record<User_Publickey, Array<Public_Order>>; // cid->star_record
+interface Star_Enrty {
+    star_list: Record<User_Publickey, Array<Public_Order>> // cid->star_record
+};
 
 // {	// fingerprint_index_entry
 // 	simhash: [
@@ -123,13 +132,17 @@ interface Fingerprint_Index_Entry {	// fingerprint_index_entry
 // 	<CID_Str>,	// public_order 对应的 knowledge 的 metadata 的 CID_Str
 //     ...
 // ]
-type Knowledge_Metadata_Index_Entry = Array<CID_Str>; // cid-> Knowledge_Metadata
+interface Knowledge_Metadata_Index_Entry {
+    knowledge_metadata_index_list: Array<CID_Str> // cid-> Knowledge_Metadata
+};
 
 // [	// knowledge_checkreport_index_entry
 // 	<CID_Str>,	// public_order 对应的 knowledge 的 checkreport 的 CID_Str
 //     ...
 // ]
-type Knowledge_Checkreport_Index_Entry = Array<CID_Str>; // cid-> Checkreport
+interface Knowledge_Checkreport_Index_Entry {
+    knowledge_checkreport_index_list: Array<CID_Str> // cid-> Checkreport
+};
 
 interface Knownoknown_Entry {	// KnowNoKnownEntry
     base_entry: {	// 系统各存储部分的entry
@@ -138,6 +151,7 @@ interface Knownoknown_Entry {	// KnowNoKnownEntry
         notice_entry: CID, // 存储针对用户的通知信息, cid-> Notice_Entry
     	application_entry: CID, // 存储请求事件，是一个常更新文件, cid-> Application_Entry
         comment_entry: CID, // 存储针对知识的评论, cid-> Comment_Entry
+        star_entry: CID, // 存储收藏记录, cid-> Star_Enrty
     },
     index_entry: { // 专用于快速索引的entry，内部使用伪索引
         fingerprint_index_entry: CID,	// 知识指纹, cid-> Fingerprint_Index_Entry

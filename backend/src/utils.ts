@@ -117,7 +117,7 @@ function debugConsole(helia: any) {
     });
 }
 
-export async function createMyHelia(): Promise<HeliaLibp2p<Libp2p<ServiceMap>>> {
+async function createMyHelia(): Promise<HeliaLibp2p<Libp2p<ServiceMap>>> {
 
     // 检查并创建目录
     checkAndCreateDir();
@@ -173,3 +173,28 @@ export async function createMyHelia(): Promise<HeliaLibp2p<Libp2p<ServiceMap>>> 
 
     return helia
 }
+
+
+
+async function streamToBuffer(stream: AsyncIterable<Uint8Array>): Promise<Buffer> {
+  let totalLength = 0;
+  const chunks: Uint8Array[] = [];
+
+  // 计算总长度并收集块
+  for await (const chunk of stream) {
+      chunks.push(chunk);
+      totalLength += chunk.length;
+  }
+
+  // 预分配 Buffer 并逐个写入块
+  const buffer = Buffer.allocUnsafe(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+      buffer.set(chunk, offset);
+      offset += chunk.length;
+  }
+
+  return buffer;
+}
+
+export { createMyHelia, streamToBuffer }

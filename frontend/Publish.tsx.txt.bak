@@ -1,0 +1,366 @@
+// 'use client';
+
+// import React, { useState, useEffect } from 'react';
+// import { Container, Form, Button, Card, Spinner, Tabs, Tab, Alert, Row, Col, Dropdown } from 'react-bootstrap';
+// import { FaFileImport, FaFileExport, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
+
+// export default function Publish() {
+//   // 当前活动的标签页
+//   const [activeTab, setActiveTab] = useState('basic-info');
+  
+//   // 基本信息表单状态
+//   const [basicInfo, setBasicInfo] = useState({
+//     title: '',
+//     price: 0,
+//     capacity: 0,
+//     isFree: false
+//   });
+  
+//   // 表单验证状态
+//   const [validated, setValidated] = useState(false);
+  
+//   // 处理基本信息表单变化
+//   const handleBasicInfoChange = (e: any) => {
+//     const { name, value, type, checked } = e.target;
+    
+//     if (type === 'checkbox') {
+//       // 处理复选框
+//       setBasicInfo(prev => ({
+//         ...prev,
+//         [name]: checked,
+//         // 如果勾选了免费，则价格和容量设为0
+//         ...(name === 'isFree' && checked ? { price: 0, capacity: 0 } : {})
+//       }));
+//     } else {
+//       // 处理其他输入
+//       setBasicInfo(prev => ({
+//         ...prev,
+//         [name]: type === 'number' ? (value === '' ? 0 : Number(value)) : value
+//       }));
+//     }
+//   };
+  
+//   // 处理下一步按钮点击
+//   const handleNextStep = (e: any) => {
+//     const form = e.currentTarget.form;
+    
+//     if (form && form.checkValidity() === false) {
+//       e.preventDefault();
+//       e.stopPropagation();
+//       setValidated(true);
+//       return;
+//     }
+    
+//     // 根据当前标签页确定下一个标签页
+//     if (activeTab === 'basic-info') {
+//       setActiveTab('chapter-content');
+//     } else if (activeTab === 'chapter-content') {
+//       setActiveTab('knowledge-intro');
+//     } else if (activeTab === 'knowledge-intro') {
+//       setActiveTab('check-report');
+//     }
+//   };
+  
+//   // 处理上一步按钮点击
+//   const handlePrevStep = () => {
+//     // 根据当前标签页确定上一个标签页
+//     if (activeTab === 'chapter-content') {
+//       setActiveTab('basic-info');
+//     } else if (activeTab === 'knowledge-intro') {
+//       setActiveTab('chapter-content');
+//     } else if (activeTab === 'check-report') {
+//       setActiveTab('knowledge-intro');
+//     }
+//   };
+  
+//   // 处理工作流导入
+//   const handleImportWorkflow = () => {
+//     // 模拟导入功能
+//     console.log('导入工作流');
+//     // 这里可以添加文件选择器和导入逻辑
+//   };
+  
+//   // 处理工作流导出
+//   const handleExportWorkflow = () => {
+//     // 模拟导出功能
+//     console.log('导出工作流');
+//     // 这里可以添加导出逻辑
+//   };
+  
+//   // 自定义标签样式
+//   const customTabStyle = {
+//     '--bs-nav-link-color': '#555',
+//     '--bs-nav-tabs-link-active-color': '#ff4c4c',
+//     '--bs-nav-tabs-link-hover-border-color': 'transparent transparent #dee2e6',
+//     '--bs-nav-tabs-link-active-border-color': 'transparent transparent #ff4c4c',
+//     '--bs-nav-tabs-border-width': '0 0 1px 0',
+//     '--bs-nav-tabs-border-color': '#dee2e6',
+//   } as React.CSSProperties;
+  
+//   return (
+//     <Container className="py-2">
+//       {/* 标题和工作流管理区域 */}
+//       <div className="d-flex justify-content-between align-items-center mb-3">
+//         <h4 className="mb-0 fw-bold">知识发布</h4>
+//         <Dropdown>
+//           <Dropdown.Toggle variant="outline-secondary" id="workflow-dropdown">
+//             工作流管理
+//           </Dropdown.Toggle>
+//           <Dropdown.Menu>
+//             <Dropdown.Item onClick={handleImportWorkflow}>
+//               <FaFileImport className="me-2" />
+//               导入工作流
+//             </Dropdown.Item>
+//             <Dropdown.Item onClick={handleExportWorkflow}>
+//               <FaFileExport className="me-2" />
+//               导出工作流
+//             </Dropdown.Item>
+//           </Dropdown.Menu>
+//         </Dropdown>
+//       </div>
+      
+//       {/* 标签栏区域 */}
+//       <div className="mb-3 tab-container">
+//         <Tabs
+//           activeKey={activeTab}
+//           id="publish-tabs"
+//           onSelect={(k) => {/* 禁止直接点击切换 */}}
+//           className="mb-0 border-0 custom-tabs"
+//           style={customTabStyle}
+//         >
+//           <Tab eventKey="basic-info" title="基本信息" />
+//           <Tab eventKey="chapter-content" title="章节内容" />
+//           <Tab eventKey="knowledge-intro" title="知识简介" />
+//           <Tab eventKey="check-report" title="检测报告" />
+//         </Tabs>
+//       </div>
+      
+//       {/* 内容卡片区域 */}
+//       <Card className="shadow border-0 card-custom">
+//         {activeTab === 'basic-info' && (
+//           <>
+//             <Card.Header className="bg-light py-4">
+//               <h5 className="mb-0 fw-bold ms-2">基本信息</h5>
+//             </Card.Header>
+//             <Card.Body>
+//               <Form noValidate validated={validated}>
+//                 <Row>
+//                   <Col md={10} lg={8}>
+//                     <Form.Group className="mb-3">
+//                       <Form.Label>知识标题</Form.Label>
+//                       <Form.Control
+//                         type="text"
+//                         name="title"
+//                         value={basicInfo.title}
+//                         onChange={handleBasicInfoChange}
+//                         required
+//                         placeholder="请输入知识标题"
+//                       />
+//                       <Form.Control.Feedback type="invalid">
+//                         请输入知识标题
+//                       </Form.Control.Feedback>
+//                     </Form.Group>
+                    
+//                     <Form.Group className="mb-3">
+//                       <Form.Check
+//                         type="checkbox"
+//                         id="free-knowledge-checkbox"
+//                         name="isFree"
+//                         label="发布免费知识"
+//                         checked={basicInfo.isFree}
+//                         onChange={handleBasicInfoChange}
+//                       />
+//                     </Form.Group>
+                    
+//                     <Form.Group className="mb-3">
+//                       <Form.Label>Mina定价</Form.Label>
+//                       <Form.Control
+//                         type="number"
+//                         name="price"
+//                         value={basicInfo.price}
+//                         onChange={handleBasicInfoChange}
+//                         disabled={basicInfo.isFree}
+//                         min={basicInfo.isFree ? 0 : 1}
+//                         required
+//                         placeholder="请输入Mina定价"
+//                       />
+//                       <Form.Control.Feedback type="invalid">
+//                         {basicInfo.isFree ? '' : 'Mina定价不能低于1'}
+//                       </Form.Control.Feedback>
+//                       <Form.Text className="text-muted">
+//                         {basicInfo.isFree ? '免费知识无需设置价格' : '付费知识的最低定价为1 Mina'}
+//                       </Form.Text>
+//                     </Form.Group>
+                    
+//                     <Form.Group className="mb-3">
+//                       <Form.Label>销售容量</Form.Label>
+//                       <Form.Control
+//                         type="number"
+//                         name="capacity"
+//                         value={basicInfo.capacity}
+//                         onChange={handleBasicInfoChange}
+//                         disabled={basicInfo.isFree}
+//                         min={basicInfo.isFree ? 0 : 1}
+//                         required
+//                         placeholder="请输入销售容量"
+//                       />
+//                       <Form.Control.Feedback type="invalid">
+//                         {basicInfo.isFree ? '' : '销售容量不能低于1'}
+//                       </Form.Control.Feedback>
+//                       <Form.Text className="text-muted">
+//                         {basicInfo.isFree ? '免费知识无需设置销售容量' : '设置此知识的最大销售数量'}
+//                       </Form.Text>
+//                     </Form.Group>
+//                   </Col>
+//                 </Row>
+//               </Form>
+//             </Card.Body>
+//             <Card.Footer className="bg-white d-flex justify-content-end">
+//               <Button 
+//                 variant="danger" 
+//                 onClick={handleNextStep}
+//                 className="d-flex align-items-center"
+//               >
+//                 下一步
+//                 <FaArrowRight className="ms-2" />
+//               </Button>
+//             </Card.Footer>
+//           </>
+//         )}
+        
+//         {activeTab === 'chapter-content' && (
+//           <>
+//             <Card.Header className="bg-light py-4">
+//               <h5 className="mb-0 fw-bold ms-2">章节内容</h5>
+//             </Card.Header>
+//             <Card.Body>
+//               <div className="text-center py-5">
+//                 <p className="text-muted">章节内容标签页（待开发）</p>
+//               </div>
+//             </Card.Body>
+//             <Card.Footer className="bg-white d-flex justify-content-between">
+//               <Button 
+//                 variant="outline-secondary" 
+//                 onClick={handlePrevStep}
+//                 className="d-flex align-items-center"
+//               >
+//                 <FaArrowLeft className="me-2" />
+//                 上一步
+//               </Button>
+//               <Button 
+//                 variant="danger" 
+//                 onClick={handleNextStep}
+//                 className="d-flex align-items-center"
+//               >
+//                 下一步
+//                 <FaArrowRight className="ms-2" />
+//               </Button>
+//             </Card.Footer>
+//           </>
+//         )}
+        
+//         {activeTab === 'knowledge-intro' && (
+//           <>
+//             <Card.Header className="bg-light py-4">
+//               <h5 className="mb-0 fw-bold ms-2">知识简介</h5>
+//             </Card.Header>
+//             <Card.Body>
+//               <div className="text-center py-5">
+//                 <p className="text-muted">知识简介标签页（待开发）</p>
+//               </div>
+//             </Card.Body>
+//             <Card.Footer className="bg-white d-flex justify-content-between">
+//               <Button 
+//                 variant="outline-secondary" 
+//                 onClick={handlePrevStep}
+//                 className="d-flex align-items-center"
+//               >
+//                 <FaArrowLeft className="me-2" />
+//                 上一步
+//               </Button>
+//               <Button 
+//                 variant="danger" 
+//                 onClick={handleNextStep}
+//                 className="d-flex align-items-center"
+//               >
+//                 下一步
+//                 <FaArrowRight className="ms-2" />
+//               </Button>
+//             </Card.Footer>
+//           </>
+//         )}
+        
+//         {activeTab === 'check-report' && (
+//           <>
+//             <Card.Header className="bg-light py-4">
+//               <h5 className="mb-0 fw-bold ms-2">检测报告</h5>
+//             </Card.Header>
+//             <Card.Body>
+//               <div className="text-center py-5">
+//                 <p className="text-muted">检测报告标签页（待开发）</p>
+//               </div>
+//             </Card.Body>
+//             <Card.Footer className="bg-white d-flex justify-content-between">
+//               <Button 
+//                 variant="outline-secondary" 
+//                 onClick={handlePrevStep}
+//                 className="d-flex align-items-center"
+//               >
+//                 <FaArrowLeft className="me-2" />
+//                 上一步
+//               </Button>
+//               <Button 
+//                 variant="danger" 
+//                 className="d-flex align-items-center"
+//               >
+//                 完成发布
+//               </Button>
+//             </Card.Footer>
+//           </>
+//         )}
+//       </Card>
+      
+//       {/* 添加自定义CSS样式 */}
+//       <style jsx global>{`
+//         .tab-container {
+//           padding: 0;
+//           width: 100%;
+//           border-bottom: 1px solid #e8e8e8;
+//           margin-bottom: 1rem;
+//         }
+        
+//         .custom-tabs .nav-link {
+//           border: none;
+//           padding: 0.75rem 0.75rem;
+//           font-weight: 500;
+//           color: #555;
+//           margin-right: 0.75rem;
+//         }
+        
+//         .custom-tabs .nav-link:hover {
+//           color: #ff4c4c;
+//           background-color: transparent;
+//         }
+        
+//         .custom-tabs .nav-link.active {
+//           color: #ff4c4c;
+//           background-color: transparent;
+//           border-bottom: 2px solid #ff4c4c;
+//         }
+        
+//         .custom-tabs .nav-tabs {
+//           border-bottom: none;
+//           width: 100%;
+//         }
+        
+//         .card-custom .card-header {
+//           border-bottom: 1px solid #f0f0f0;
+//         }
+        
+//         .card-custom .card-footer {
+//           border-top: 1px solid #f0f0f0;
+//         }
+//       `}</style>
+//     </Container>
+//   );
+// } 

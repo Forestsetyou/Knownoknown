@@ -1,6 +1,6 @@
 import { TrustlessGatewayOptionsInterface, TrustlessGatewayFormatType, TrustlessGatewayDagScopeType, TrustlessGatewayResponseStatus, TrustlessGatewayCarVersionType, TrustlessGatewayCarDupsType, isValidEnumValue, TrustlessGatewayAcceptType, IPFSCarGetParams, TrustlessGatewayResponseHeaders, ipfsCodec } from './trustlessGatewayInterface.js';
 import { Request } from 'express';
-import { KnowledgeDBServer } from '../knowledgeDBServer.js';
+import { KnowledgeDBServer } from '../../knowledgeDBServer.js';
 import { CID } from 'multiformats/cid';
 
 // 基于 https://specs.ipfs.tech/http-gateways/trustless-gateway 标准

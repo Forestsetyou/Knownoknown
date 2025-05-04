@@ -1,10 +1,4 @@
 import { CID } from 'multiformats/cid'
-import { CarReader } from '@ipld/car'
-import { car, Car } from '@helia/car'
-import { createReadStream, createWriteStream } from 'fs'
-import { FsBlockstore } from 'blockstore-fs';
-import { DAGCBOR } from '@helia/dag-cbor';
-import { Buffer } from 'buffer';
 import { User_Publickey, CID_Str } from './utils';
 // 按照设计层次划分，被直接设计的dag结构使用interface，被间接设计的dag结构使用type
 
@@ -14,15 +8,13 @@ type Image_Data = Uint8Array;       // 图片数据
 
 // 指纹相似度
 type Simhash_Similarity = number;
-type Minhash_Similarity = number;
 type Winnowing_Similarity = number;
 type Phash_Similarity = number;
 
 // 指纹数据
-type Simhash_Fingerprint = Uint8Array;
-type Minhash_Fingerprint = Uint8Array;
-type Winnowing_Fingerprint = Uint8Array;
-type Phash_Fingerprint = Uint8Array;
+type Simhash_Fingerprint = string;
+type Winnowing_Fingerprint = number[];
+type Phash_Fingerprint = string;
 
 // 加密密钥
 type Decryption_Key = Uint8Array;   // 对称加密密钥
@@ -51,39 +43,13 @@ interface Knowledge_Data {	// 具体某个知识的图谱数据
     chapters: Array<CID> // 各章节cid, cid-> Knowledge_Chapter_Data
 }
 
-async function Import_Knowledge_Data_From_Car(cid: CID, bytes: Buffer, carDb: Car, blockstore: FsBlockstore): Promise<CID | null> {
-
-    const reader = createReadStream(bytes)
-    const carReader = await CarReader.fromIterable(reader)
-    
-    await carDb.import(carReader)
-    if (blockstore.has(cid)) {
-        return cid
-    }
-    return null
-}
-
-async function Export_Knowledge_Data_To_Car(export_knowledge_data_cid: CID, carDb: Car): Promise<Buffer> {
-
-    const writer = createWriteStream('test.car')
-    const bufferChunks: Buffer[] = []
-    let resultBuffer: Buffer
-    writer.on('finish', () => {
-        // 合并所有 Buffer
-        resultBuffer = Buffer.concat(bufferChunks);
-        console.log('Buffer content:', resultBuffer); // 输出 Buffer 内容
-    });
-    for await (const buf of carDb.stream(export_knowledge_data_cid)) {
-        writer.write(buf)
-        bufferChunks.push(Buffer.from(buf))
-    }
-    writer.end()
-    return resultBuffer
-}
-
-type Pure_Text_Similarity_Interface = {
-    simhash: Array<Simhash_Similarity>,	// 内部指纹数组位序表示被比较知识的public_order
-    top_5_minhash: Record<CID_Str, Minhash_Similarity>   // <KnowledgeID>: <ComparedRes>
+type Pure_Text_Similarity_Record = {
+    origin_knowledge_id: Knowledge_ID, // 本知识的id
+    compared_knowledge_id: Knowledge_ID, // 被比较知识的id
+    text_cid: CID_Str, // 本知识的纯文本cid
+    compared_text_cid: CID_Str, // 被比较知识的纯文本cid
+    similarity: Simhash_Similarity,	// 内部指纹数组位序表示被比较知识的public_order
+    score: number, // 相似度得分
 }
 
 // winnowing: {
@@ -94,17 +60,13 @@ type Pure_Text_Similarity_Interface = {
 //         },
 //     },
 // }
-type Code_Section_Similarity_Interface = {
-    winnowing: Record<
-        Knowledge_ID, // <KnowledgeID>, 被比较知识的id
-        Record<
-            CID_Str, // <CID_Str>, 本知识代码块的cid
-            Record<
-                CID_Str, // <CID_Str>, 被比较代码块的cid_str
-                Winnowing_Similarity // <ComparedRes>, 比较结果res
-            >
-        >
-    >
+type Code_Section_Similarity_Record = {
+    origin_knowledge_id: Knowledge_ID, // 本知识的id
+    compared_knowledge_id: Knowledge_ID, // 被比较知识的id
+    code_section_cid: CID_Str, // 本知识的代码块cid
+    compared_code_section_cid: CID_Str, // 被比较知识的代码块cid
+    similarity: Winnowing_Similarity, // 比较结果
+    score: number, // 相似度得分
 }
 
 
@@ -121,27 +83,21 @@ type Code_Section_Similarity_Interface = {
 //         ...
 //     }
 // },
-type Image_Similarity_Interface = {
-    phash: Record<
-        Knowledge_ID, // <KnowledgeID>, 被比较知识的id
-        Record<
-            CID_Str, // <CID_Str>, 本知识图片的cid
-            Record<
-                CID_Str, // <CID_Str>, 被比较图片的cid_str
-                Phash_Similarity // <ComparedRes>, 比较结果res
-            >
-        >
-    >
+type Image_Similarity_Record = {
+    origin_knowledge_id: Knowledge_ID, // 本知识的id
+    compared_knowledge_id: Knowledge_ID, // 被比较知识的id
+    image_cid: CID_Str, // 本知识的图片cid
+    compared_image_cid: CID_Str, // 被比较知识的图片cid
+    similarity: Phash_Similarity, // 比较结果
+    score: number, // 相似度得分
 }
 
 interface Checkreport {	// check_report
-	score: number,	// 报告综合分数
-    comment: string,	// 报告评语
-    pure_text_similarity: Pure_Text_Similarity_Interface,
+    pure_text_similarity: Array<Pure_Text_Similarity_Record>,
     pure_text_score: number,	// 文本检测分数
-    code_section_similarity: Code_Section_Similarity_Interface,
+    code_section_similarity: Array<Code_Section_Similarity_Record>,
 	code_section_score: number,	// 代码块检测分数
-    image_similarity: Image_Similarity_Interface,
+    image_similarity: Array<Image_Similarity_Record>,
 	image_score: number,	// 图片检测分数
 }	// 目前的报告格式仅用于测试，后续仍要修改
 
@@ -177,20 +133,15 @@ type Image_Fingerprint = Record<
     Phash_Fingerprint // 指纹数据
 >;
 
-type Pure_Text_Fingerprint_Data = {
-    simhash: Simhash_Fingerprint,   // simhash指纹
-    minhash: Minhash_Fingerprint    // minhash指纹
-}
-
 type Pure_Text_Fingerprint = Record<
     CID_Str, // 纯文本cid, cid -> ipfs_markdown_data
-    Pure_Text_Fingerprint_Data
+    Simhash_Fingerprint
 >
 
 interface Fingerprint_Data {	// fingerprint_data
     code_section_fingerprint: CID,	// 代码块指纹数据cid, cid-> Code_Section_Fingerprint
     image_fingerprint: CID,	// 图片指纹数据cid, cid-> Image_Fingerprint
-    pure_text_fingerprint: Pure_Text_Fingerprint // 纯文本指纹数据
+    pure_text_fingerprint: CID, // 纯文本指纹数据cid, cid-> Pure_Text_Fingerprint
 }
 
 type Intro_Interface = {
@@ -219,7 +170,12 @@ interface Knowledge_Entry {
     encrypted_car_knowledge_data: CID,	// 混合加密后的知识car数据, cid-> Encrypted_Car_Knowledge_Data
     decryption_keys: Decryption_Keys,	// 混合加密密钥
 	fingerprint_data: CID, // 知识指纹数据, cid-> Fingerprint_Data
-    check_report: CID | null,	// 知识的查重报告的CID, 生成报告后添加CID, 无报告的知识只能浏览简介, 无法被购买, 可以为null, cid-> Check_Report
+    check_report: CID,	// 知识的查重报告的CID, 生成报告后添加CID, 无报告的知识只能浏览简介, 无法被购买, 可以为null, cid-> Check_Report
 }
 
-export { Knowledge_Entry, Knowledge_ID, Md_Data, Pure_Text_Fingerprint, Code_Section_Fingerprint, Image_Fingerprint, Knowledge_Metadata, Checkreport, Public_Order };
+interface Knowledge_Check_Pack {    // 专用于管理员查验知识，将待发布知识与明文内容打包在一起
+    Knowledge_Entry: Knowledge_Entry,
+    Knowledge_Data: Knowledge_Data,
+}
+
+export { Knowledge_Entry, Knowledge_ID, Md_Data, Pure_Text_Fingerprint, Code_Section_Fingerprint, Image_Fingerprint, Knowledge_Metadata, Checkreport, Public_Order, Knowledge_Check_Pack };

@@ -1,7 +1,7 @@
 import { KnownoknownCommitment } from './KnownoknownCommitment.js';
 import { DAGProver, DAGCid } from './DAGProver.js';
-import { AccountUpdate, Field, Mina, PrivateKey, PublicKey } from 'o1js';
+import { AccountUpdate, Field, Mina, PrivateKey, PublicKey, fetchAccount } from 'o1js';
 
 export { KnownoknownCommitment as KnownoknownContract };
 export { DAGProver, DAGCid };
-export { AccountUpdate, Field, Mina, PrivateKey, PublicKey };
+export { AccountUpdate, Field, Mina, PrivateKey, PublicKey, fetchAccount };

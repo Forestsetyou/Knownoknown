@@ -1,9 +1,9 @@
 import express from 'express';
-import { TrustlessGatewayCarOptions, TrustlessGatewayRawOptions, trustlessGatewayCorsOptions, checkReqType } from './interface/trustlessGatewayOptions.js';
-import { KnowledgeDBServer } from './knowledgeDBServer.js';
-import { TrustlessGatewayResponseHeaders } from './interface/trustlessGatewayInterface.js';
 import cors from 'cors';
-import { KnownoknownContractServer } from './knownoknownContractServer.js';
+import { TrustlessGatewayCarOptions, TrustlessGatewayRawOptions, trustlessGatewayCorsOptions, checkReqType } from './interface/trustlessGateway/trustlessGatewayOptions.js';
+import { TrustlessGatewayResponseHeaders } from './interface/trustlessGateway/trustlessGatewayInterface.js';
+import { KnowledgeDBServer } from './knowledgeDBServer.js';
+import { KnownoknownLocalContractServer } from './interface/knownoknownContract/knownoknownLocalContractServer.js';
 
 const adminServerCorsOptions = {    // 管理员服务器 CORS 选项
     origin: '*',
@@ -29,13 +29,13 @@ export class ExpressApp {
     private app: express.Application;
     private knowledgeDB: KnowledgeDBServer;
     private reqCount: number;
-    private knownoknownContractServer: KnownoknownContractServer;
+    private knownoknownLocalContractServer: KnownoknownLocalContractServer;
 
     constructor() {
         this.app = express();
         this.knowledgeDB = new KnowledgeDBServer();
         this.reqCount = 0;
-        this.knownoknownContractServer = new KnownoknownContractServer();
+        this.knownoknownLocalContractServer = new KnownoknownLocalContractServer();
     }
 
     public async init() {
@@ -45,16 +45,17 @@ export class ExpressApp {
         await this.initTrustlessGateway(); // 初始化无信任网关
         await this.initDelegatedRoutingV1HTTP(); // 初始化委托路由v1 HTTP
         await this.initAdminServer(); // 初始化管理服务器
+        await this.initLocalContractServer(); // 初始化本地合约服务器
         this.start();
     }
 
     private async initPre() {
         await this.knowledgeDB.initialize();
-        await this.knownoknownContractServer.initialize();
+        await this.knownoknownLocalContractServer.initialize(await this.knowledgeDB.generateDAGCidArray('application'), await this.knowledgeDB.generateDAGCidArray('knowledge'));
     }
 
     private start() {
-        const PORT = process.env.PORT || 3000;
+        const PORT = process.env.PORT || 12891;
         this.app.listen(PORT, () => {
             console.log(`服务器已启动，监听端口 ${PORT}`);
         });
@@ -80,17 +81,103 @@ export class ExpressApp {
         })
     }
     
+    // routers for admin server
     private async initAdminServer() {
         this.app.get('/admin/status', cors(adminServerCorsOptions), async (req, res) => {
             res.json({
                 success: true,
                 status: 'online',
+                ipfsGatewayRoutingURL: "http://127.0.0.1:12891",
+                ipfsStatusFlagCID: (await this.knowledgeDB.getStatusFlagCID()).toString(),
                 knownoknownEntryCID: (await this.knowledgeDB.getKnownoknown_Entry_CID()).toString(),
+                contractAddress: (await this.knownoknownLocalContractServer.getLocalContractAddress()).toBase58(),
                 version: '1.0.0'
             })
         })
-        this.app.get('/admin/contractTest', cors(adminServerCorsOptions), async (req, res) => {
-            const result = await this.knownoknownContractServer.contractTest();
+        // this.app.get('/admin/contractTest', cors(adminServerCorsOptions), async (req, res) => {
+        //     const result = await this.knownoknownLocalContractServer.contractTest();
+        //     if (result) {
+        //         res.json({
+        //             success: true,
+        //         })
+        //     } else {
+        //         res.json({
+        //             success: false,
+        //         })
+        //     }
+        // })
+    }
+    
+    // routers for local contract server
+    private async initLocalContractServer() {
+        this.app.get('/contract/status', cors(adminServerCorsOptions), async (req, res) => {
+            res.json({
+                success: true,
+                status: 'online',
+                contractAddress: (await this.knownoknownLocalContractServer.getLocalContractAddress()).toBase58(),
+                version: '1.0.0'
+            })
+        })
+        this.app.get('/contract/fields/:contractAddress', cors(adminServerCorsOptions), async (req, res) => {
+            const contractAddress = req.params.contractAddress;
+            const result = await this.knownoknownLocalContractServer.getContractFields(contractAddress);
+            if (result) {
+                res.json({
+                    success: true,
+                    fields: result
+                })
+            } else {
+                res.json({
+                    success: false,
+                })
+            }
+        })
+        this.app.get('/contract/accountsInfo', cors(adminServerCorsOptions), async (req, res) => {
+            const result = await this.knownoknownLocalContractServer.getLocalAccountsInfo();
+            if (result) {
+                res.json({
+                    success: true,
+                    accountsInfo: result
+                })
+            } else {
+                res.json({
+                    success: false,
+                })
+            }
+        })
+        this.app.get('/contract/accountInfo/:pvk', cors(adminServerCorsOptions), async (req, res) => {
+            const pvk = req.params.pvk;
+            const result = await this.knownoknownLocalContractServer.getLocalAccountInfo(pvk);
+            if (result) {
+                res.json({
+                    success: true,
+                    accountInfo: result
+                })
+            } else {
+                res.json({
+                    success: false,
+                })
+            }
+        })
+        this.app.post('/contract/method/publish', cors(adminServerCorsOptions), async (req, res) => {
+            const type = req.body.type;
+            if ((type !== 'knowledge' && type !== 'application')) {
+                res.json({
+                    success: false,
+                    error: 'invalid type'
+                })
+                return;
+            }
+            const pvk = req.body.pvk;
+            const publishCid = req.body.publishCid;
+            if (!pvk || !publishCid) {
+                res.json({
+                    success: false,
+                    error: 'invalid params'
+                })
+                return;
+            }
+            const result = await this.knownoknownLocalContractServer.submitPublish(type, publishCid, pvk);
             if (result) {
                 res.json({
                     success: true,
@@ -98,6 +185,39 @@ export class ExpressApp {
             } else {
                 res.json({
                     success: false,
+                    error: 'failed to submit publish'
+                })
+            }
+        })
+
+        this.app.post('/contract/method/update', cors(adminServerCorsOptions), async (req, res) => {
+            const type = req.body.type;
+            if (type !== 'knowledge' && type !== 'application') {
+                res.json({
+                    success: false,
+                    error: 'invalid type'
+                })
+                return;
+            }
+            const pvk = req.body.pvk;
+            const updateFromCid = req.body.updateFromCid;
+            const updateToCid = req.body.updateToCid;
+            if (!pvk || !updateFromCid || !updateToCid) {
+                res.json({
+                    success: false,
+                    error: 'invalid params'
+                })
+                return;
+            }
+            const result = await this.knownoknownLocalContractServer.submitUpdate(type, updateFromCid, updateToCid, pvk);
+            if (result) {
+                res.json({
+                    success: true,
+                })
+            } else {
+                res.json({
+                    success: false,
+                    error: 'failed to submit publish'
                 })
             }
         })
