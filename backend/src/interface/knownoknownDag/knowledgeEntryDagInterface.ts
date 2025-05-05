@@ -5,6 +5,7 @@ import { User_Publickey, CID_Str } from './utils';
 // md内部数据
 type Code_Section_Data = string;    // 代码块数据
 type Image_Data = Uint8Array;       // 图片数据
+const IMAGE_DATA_TYPE = 'image/jpeg';   // 图片数据类型
 
 // 指纹相似度
 type Simhash_Similarity = number;
@@ -24,18 +25,87 @@ type Md_Data = string;
 type Knowledge_ID = CID_Str;
 type Public_Order = number; // 知识发布顺序
 
-// 将markdown数据从原始格式转换为支持ipfs的特殊格式, 即将原始的代码块与图片链接替换为本项目设计的特殊外链
-function Convert_Md_From_Original_To_IPFS(md_data: Md_Data) {}
-// 将markdown数据从支持ipfs的特殊格式转换为原始格式, 即将本项目设计的特殊外链替换为原始的代码块与图片链接
-function Convert_Md_From_IPFS_To_Original(md_data: Md_Data) {}
+// 自定义外链格式
+enum Custom_Link_Format {
+    IMAGE = '<KnownoknownImage:CID>',   // ![](<KnownoknownImage:CID>)
+    CODE = '![<KnownoknownCode:type>](CID)',
+}
+
+enum Code_Type {
+    JAVA = 'java',
+    C = 'c',
+    CPP = 'cpp',
+    PYTHON = 'python',
+    JAVASCRIPT = 'javascript'
+}
+
+const Image_Link_Format_Regex = /!\[([^\]]*)\]\(<KnownoknownImage:([^>]+)>\)/g;
+
+const Code_Link_Format_Regex = new RegExp(`!\\[<KnownoknownCode:(${Object.values(Code_Type).join("|")})>]\\(([^)]+)\\)`, "g");
+
+const Code_Section_Regex = new RegExp(`\\\`\\\`\\\`(${Object.values(Code_Type).join("|")})\\\n([\\s\\S]*?)\\\n\\\`\\\`\\\``, "g");
+
+// 识别图片外链
+function Find_Image_Link(md_data: Md_Data) {
+    const matches = Array.from(md_data.matchAll(Image_Link_Format_Regex));
+    const image_link_data: Array<string> = [];
+
+    if (matches) {
+        matches.forEach(match => {
+            image_link_data.push(match[1]);
+        });
+    }
+
+    return image_link_data;
+}
+
+// 识别代码块外链
+function Find_Code_Link(md_data: Md_Data) {
+    const matches = Array.from(md_data.matchAll(Code_Link_Format_Regex));
+    const code_link_data: Array<{cid: string, type: Code_Type}> = [];
+
+    if (matches) {
+        matches.forEach(match => {
+            code_link_data.push({
+                type: match[1] as Code_Type,
+                cid: match[2],
+            })
+        });
+    }
+
+    return code_link_data;
+}
+
+// 提取代码块为外链
+function Extract_Code_Link(md_data: Md_Data) {
+    const matches = Array.from(md_data.matchAll(Code_Section_Regex));
+    const code_section_data: Array<{code: string, type: Code_Type}> = [];
+
+    if (matches) {
+        matches.forEach(match => {
+            code_section_data.push({
+                type: match[1] as Code_Type,
+                code: match[2],
+            })
+        });
+    }
+    
+    return code_section_data;
+}
+
+interface Tmp_Image_Pack {
+    id: number,
+    images: Record<string, CID>
+}
 
 interface Knowledge_Chapter_Data {    // 知识章节数据
+    id: number, // 章节id 随机时间序列
     chapter_title: string, // 章节标题
     ipfs_markdown_data: Md_Data, // ipfs特殊支持 的章节 markdown 数据
     code_section_num: number, // 代码段数量
-    code_sections: Array<CID>, // 代码段cid, cid-> Code_Section_Data
+    code_sections: Record<string, CID>, // 代码段外链:代码段cid, cid-> Code_Section_Data
     image_num: number, // 图片数量
-    images: Array<CID> // 图片cid, cid-> Image_Data
+    images: Record<string, CID> // 图片外链:图片cid, cid-> Image_Data
 }
 
 interface Knowledge_Data {	// 具体某个知识的图谱数据
@@ -99,6 +169,7 @@ interface Checkreport {	// check_report
 	code_section_score: number,	// 代码块检测分数
     image_similarity: Array<Image_Similarity_Record>,
 	image_score: number,	// 图片检测分数
+    fingerprint_data_cid_str: string, // 报告对应的指纹数据cid_str
 }	// 目前的报告格式仅用于测试，后续仍要修改
 
 
@@ -111,13 +182,6 @@ interface Checkreport {	// check_report
 //     },
 //     ...
 // },
-enum Code_Type {
-    JAVA = 'java',
-    C = 'c',
-    CPP = 'cpp',
-    PYTHON = 'python',
-    JAVASCRIPT = 'javascript'
-}
 
 type Code_Section_Fingerprint_Record = {
     type: Code_Type, // <CodeType>, 代码类型
@@ -142,22 +206,24 @@ interface Fingerprint_Data {	// fingerprint_data
     code_section_fingerprint: CID,	// 代码块指纹数据cid, cid-> Code_Section_Fingerprint
     image_fingerprint: CID,	// 图片指纹数据cid, cid-> Image_Fingerprint
     pure_text_fingerprint: CID, // 纯文本指纹数据cid, cid-> Pure_Text_Fingerprint
+    knowledge_data_cid_str: string, // 对应知识数据的cid_str
 }
 
 type Intro_Interface = {
     content: string, // 简介正文
-    images: Array<CID> // 简介的图片数据，索引地址只能是CID，图片顺序严格遵循数组顺序，最多三张
+    image: CID // 简介的封面图片数据，索引地址只能是CID
 }
 
 interface Knowledge_Metadata {	// 'metadata' for knowledge
-	id: Knowledge_ID, // 知识ID, 现决定使用本知识的encrypted_car_knowledge_data_cid的cid_str来标识该id
+	id: Knowledge_ID, // 知识ID, 现决定使用本知识的knowledge_data_cid的cid_str来标识该id
     public_order: Public_Order,	// 在整个知识档案中本知识的发布位序，即第几个发布，同时也是报告生成位序，决定其需要比较的指纹组数。
     title: string, // 知识实体标题
     author: User_Publickey, // 创作者的账户地址, PublicKey
     price: number, // Mina定价 2e9 Mina = 2 Mina
     sales: number, // 发售量，购买该知识的用户数量
     sale_volume: number, // 发售容量，发售数量达到该容量后知识内容将被公开
-    intro: Intro_Interface
+    intro: Intro_Interface,
+    tags: Array<string> // 知识标签
 }
 
 interface Decryption_Keys {	// 混合加密密钥
@@ -173,9 +239,11 @@ interface Knowledge_Entry {
     check_report: CID,	// 知识的查重报告的CID, 生成报告后添加CID, 无报告的知识只能浏览简介, 无法被购买, 可以为null, cid-> Check_Report
 }
 
-interface Knowledge_Check_Pack {    // 专用于管理员查验知识，将待发布知识与明文内容打包在一起
+interface Knowledge_Check_Pack {    // 专用于创建知识和管理员查验知识，将待发布知识与明文内容打包在一起
     Knowledge_Entry: Knowledge_Entry,
     Knowledge_Data: Knowledge_Data,
 }
 
-export { Knowledge_Entry, Knowledge_ID, Md_Data, Pure_Text_Fingerprint, Code_Section_Fingerprint, Image_Fingerprint, Knowledge_Metadata, Checkreport, Public_Order, Knowledge_Check_Pack };
+export type { Knowledge_Entry, Knowledge_ID, Md_Data, Pure_Text_Fingerprint, Code_Section_Fingerprint, Image_Fingerprint, Knowledge_Metadata, Checkreport, Public_Order, Knowledge_Check_Pack, Knowledge_Chapter_Data, Code_Section_Data, Image_Data, Tmp_Image_Pack, Fingerprint_Data };
+
+export { Custom_Link_Format, Code_Type, IMAGE_DATA_TYPE, Image_Link_Format_Regex, Code_Link_Format_Regex, Code_Section_Regex };

@@ -309,4 +309,81 @@ class KnownoknownDagManager {
     }
 }
 
-export { KnownoknownDagManager };
+
+class KnownoknownFingerprintGenerator {
+    private helia: HeliaLibp2p<Libp2p<ServiceMap>> | Helia;
+    private knowledgeDataCid: CID;
+    private pureTextFingerprintCid?: CID;
+    private imageFingerprintCid?: CID;
+    private codeSectionFingerprintCid?: CID;
+    private fingerprintDataCid?: CID;
+
+    constructor(helia: HeliaLibp2p<Libp2p<ServiceMap>> | Helia, knowledgeDataCid: CID) {
+        this.helia = helia;
+        this.knowledgeDataCid = knowledgeDataCid;
+    }
+
+    async clear() {
+        await this.pinRm(this.knowledgeDataCid);
+        if (this.pureTextFingerprintCid) {
+            await this.pinRm(this.pureTextFingerprintCid);
+        }
+        if (this.imageFingerprintCid) {
+            await this.pinRm(this.imageFingerprintCid);
+        }
+        if (this.codeSectionFingerprintCid) {
+            await this.pinRm(this.codeSectionFingerprintCid);
+        }
+        if (this.fingerprintDataCid) {
+            await this.pinRm(this.fingerprintDataCid);
+        }
+    }
+
+    async pinAdd(cid: CID, option: AddOptions = {}) {
+        const pinOption = { // 添加定时
+            ...option,
+            signal: AbortSignal.timeout(PIN_TIMEOUT),
+        }
+        for await (const pinnedCID of this.helia.pins.add(cid, pinOption)) {
+            console.log("pinnedCID:", pinnedCID);
+        }
+    }
+
+    async pinRm(cid: CID, option: RmOptions = {}) {
+        const rmOption = { // 添加定时
+            ...option,
+            signal: AbortSignal.timeout(PIN_TIMEOUT),
+        }
+        for await (const rmPinnedCID of this.helia.pins.rm(cid, rmOption)) {
+            console.log("rmPinnedCID:", rmPinnedCID);
+        }
+        this.helia.gc();
+    }
+
+    async initialize() {
+        await this.pinAdd(this.knowledgeDataCid);
+    }
+
+    async setPureTextFingerprint(newEntryCID: CID) {
+        await this.pinAdd(newEntryCID);
+        this.pureTextFingerprintCid = newEntryCID;
+    }
+
+    async setImageFingerprint(newEntryCID: CID) {
+        await this.pinAdd(newEntryCID);
+        this.imageFingerprintCid = newEntryCID;
+    }
+
+    async setCodeSectionFingerprint(newEntryCID: CID) {
+        await this.pinAdd(newEntryCID);
+        this.codeSectionFingerprintCid = newEntryCID;
+    }
+
+    async setFingerprintData(newEntryCID: CID) {
+        await this.pinAdd(newEntryCID);
+        this.fingerprintDataCid = newEntryCID;
+    }
+    
+}
+
+export { KnownoknownDagManager, KnownoknownFingerprintGenerator };

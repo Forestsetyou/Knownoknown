@@ -4,7 +4,7 @@ import { dagCbor } from '@helia/dag-cbor'
 import { car } from '@helia/car'
 import { CID } from 'multiformats/cid'
 import { readFileSync } from 'fs'
-import { PHash, imageSimilarity, imageScore } from './imageFingerprint.js'
+import { PHash, ImageSimilarity, ImageScore } from './imageFingerprint.js'
 import { streamToBuffer } from '../../utils.js'
 import { CarReader } from '@ipld/car'
 
@@ -46,10 +46,10 @@ let imageBuffer1 = await streamToBuffer(imageDataReader1)
 let imageBuffer2 = await streamToBuffer(imageDataReader2)
 const hash1 = await PHash(imageBuffer1, '系统架构图100.drawio.png')
 const hash2 = await PHash(imageBuffer2, '系统架构图100-改2.drawio.png')
-const sim = imageSimilarity(hash1, hash2)
+const sim = ImageSimilarity(hash1, hash2)
 console.log(hash1)
 console.log(hash2)
-console.log(imageScore(sim))
+console.log(ImageScore(sim))
 
 
 await helia.stop()

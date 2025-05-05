@@ -25,7 +25,7 @@ const defaultWalletStatus : WalletStatus = {
 
 const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [walletStatus, setWalletStatus] = useState<WalletStatus>(defaultWalletStatus);
-    const [localWalletService, setLocalWalletService] = useState<LocalWalletService>(new LocalWalletService());
+    const [localWalletService, setLocalWalletService] = useState<LocalWalletService | undefined>(undefined);
   
     // for initialization
     const [initialized, setInitialized] = useState(false);
@@ -39,6 +39,8 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     useEffect(() => {
         const init = async () => {
             setInitializationStatus('初始化钱包...')
+            const localWalletService = new LocalWalletService();
+            setLocalWalletService(localWalletService);
             setInitialized(true);
         }
         if (!initialized) {
@@ -85,14 +87,14 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                 connecting: true,
             }));
             
-            if (await localWalletService.connectWallet()) {
-                const balance = Number(await localWalletService.getWalletBalance() as unknown as string)/1e9;
+            if (await localWalletService!.connectWallet()) {
+                const balance = Number(await localWalletService!.getWalletBalance() as unknown as string)/1e9;
                 setWalletStatus((prev:WalletStatus) => ({
                     ...prev,
                     connected: true,
                     connecting: false,
-                    address: (localWalletService.getWalletAddress()) as unknown as string,
-                    key: (localWalletService.getWalletKey()) as unknown as string,
+                    address: (localWalletService!.getWalletAddress()) as unknown as string,
+                    key: (localWalletService!.getWalletKey()) as unknown as string,
                     balance: `${balance}`,
                 }));
                 walletBalanceChecker = setInterval(getWalletBalance, 120000); // 120秒更新一次钱包余额
@@ -116,7 +118,7 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
     const disconnectWallet = async () => {
         try {
-            localWalletService.disconnectWallet();
+            localWalletService!.disconnectWallet();
             setWalletStatus((prev:WalletStatus) => ({
                 ...prev,
                 connected: false,
@@ -132,7 +134,7 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     }
 
     const getWalletBalance = async () => {
-      const balance = Number(await localWalletService.getWalletBalance() as unknown as string)/1e9;
+      const balance = Number(await localWalletService!.getWalletBalance() as unknown as string)/1e9;
       setWalletStatus((prev:WalletStatus) => ({
         ...prev,
         balance: `${balance}`,
@@ -141,12 +143,12 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     }
 
     const validatePrivateKey = async (keyValue: string) => {
-        return await localWalletService.validatePrivateKey(keyValue);
+        return await localWalletService!.validatePrivateKey(keyValue);
     }
 
     const setKey = async (keyValue: string) => {
         try {
-          localWalletService.setWalletKey(keyValue);
+          localWalletService!.setWalletKey(keyValue);
 
           // 更新钱包状态，添加密钥
           setWalletStatus((prev:WalletStatus) => ({

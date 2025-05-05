@@ -8,8 +8,14 @@ import { car, Car } from '@helia/car'
 import { createMyHelia } from './utils.js';
 import { CID } from 'multiformats/cid'
 import { Knownoknown_Entry, Knowledge_List_Entry, Notice_Entry, Application_Entry, Comment_Entry, Star_Enrty, Knowledge_Comment_Index_Entry, Fingerprint_Index_Entry, Knowledge_Metadata_Index_Entry, Knowledge_Checkreport_Index_Entry, Knownoknown_Metadata } from './interface/knownoknownDag/knownoknownDagInterface.js';
-import { KnownoknownDagManager } from './interface/knownoknownDag/knownoknownDagManager.js';
+import { KnownoknownDagManager, KnownoknownFingerprintGenerator } from './interface/knownoknownDag/knownoknownDagManager.js';
+import { IMAGE_DATA_TYPE, Code_Link_Format_Regex } from './interface/knownoknownDag/knowledgeEntryDagInterface.js';
 import { DAGCid } from 'knownoknown-contract';
+import { CarReader } from '@ipld/car'
+import { SimHash, TextSimilarity, TextScore } from "./interface/fingerprintProcess/textFingerprint.js";
+import { PHash, imageSimilarity, imageScore } from './interface/fingerprintProcess/imageFingerprint.js'
+import { streamToBuffer } from './utils.js'
+import { Winnowing, CodeSimilarity, CodeScore } from './interface/fingerprintProcess/codeFingerprint.js';
 
 export class KnowledgeDBServer {
     private helia: HeliaLibp2p<Libp2p<ServiceMap>>;
@@ -173,6 +179,63 @@ export class KnowledgeDBServer {
         console.log("dag_3_data:", JSON.stringify(dag_3, null, 2));
         console.log("dag_3_cid:", dagCid_3);
         console.log("--------------add example data end--------------");
+    }
+    
+    // 以下是知识数据管理方法
+    async extractFingerprintDataFromKnowledgeDataCar(knowledgeDataCarBytes: Uint8Array) {
+        const carReader = await CarReader.fromBytes(knowledgeDataCarBytes);
+        const knowledgeDataCid = (await carReader.getRoots())[0];
+        await this.car.import(carReader);
+        const knownoknownFingerprintGenerator = new KnownoknownFingerprintGenerator(this.helia, knowledgeDataCid);
+        await knownoknownFingerprintGenerator.initialize();
+        const knowledgeData = (await this.dagCbor.get(knowledgeDataCid)) as any;
+        const pureTextArr: string[] = [];
+        const imageFingerprint = {}
+        const codeFingerprint = {}
+        for (const chapter of knowledgeData.chapters) {
+            const chapterData = (await this.dagCbor.get(chapter)) as any;
+            pureTextArr.push(chapterData.ipfs_markdown_data);
+            for (const imageLink in chapterData.images) {
+                const imageReader = this.fs.cat(chapterData.images[imageLink])
+                const imageData = await streamToBuffer(imageReader);
+                const imageFingerprintData = await PHash(imageData, `${imageLink}.${IMAGE_DATA_TYPE.split("/")[1]}`);
+                imageFingerprint[chapterData.images[imageLink].toString()] = imageFingerprintData;
+            }
+            for (const codeLink in chapterData.code_sections) {
+                const codeReader = this.fs.cat(chapterData.code_sections[codeLink])
+                const code = new TextDecoder().decode(await streamToBuffer(codeReader));
+                const localRegex = new RegExp(Code_Link_Format_Regex, "g");
+                const codeType = localRegex.exec(codeLink)?.[1];
+                const codeFingerprintData = Winnowing(code, codeType);
+                codeFingerprint[(chapterData.code_sections[codeLink]).toString()] = {
+                    type: codeType,
+                    fingerprint: codeFingerprintData
+                };
+            }
+        }
+        const pureText = pureTextArr.join("\n");
+        const pureTextCID = await this.fs.addBytes(new TextEncoder().encode(pureText));
+        const pureTextFingerprintData = SimHash(pureText);
+        const pureTextFingerprint = {
+            [pureTextCID.toString()]: pureTextFingerprintData
+        }
+        const pureTextFingerprintCid = await this.dagCbor.add(pureTextFingerprint);
+        await knownoknownFingerprintGenerator.setPureTextFingerprint(pureTextFingerprintCid);
+        const imageFingerprintCid = await this.dagCbor.add(imageFingerprint);
+        await knownoknownFingerprintGenerator.setImageFingerprint(imageFingerprintCid);
+        const codeFingerprintCid = await this.dagCbor.add(codeFingerprint);
+        await knownoknownFingerprintGenerator.setCodeSectionFingerprint(codeFingerprintCid);
+        const fingerprintData = {
+            code_section_fingerprint: codeFingerprintCid,
+            image_fingerprint: imageFingerprintCid,
+            pure_text_fingerprint: pureTextFingerprintCid,
+            knowledge_data_cid_str: knowledgeDataCid.toString()
+        }
+        const fingerprintDataCid = await this.dagCbor.add(fingerprintData);
+        const carStreamReader = this.car.stream(fingerprintDataCid)
+        const carBytes = new Uint8Array(await streamToBuffer(carStreamReader));
+        await knownoknownFingerprintGenerator.clear();
+        return carBytes;
     }
 
     // 以下是合约电路需要的方法

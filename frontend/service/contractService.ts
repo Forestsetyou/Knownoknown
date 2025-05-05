@@ -25,10 +25,10 @@ class LocalZkappService {
       }
     }
     // Initialize the worker from the zkappWorker module
-    const worker = new Worker(new URL('./localContractWorker.ts', import.meta.url), { type: 'module' });
-    worker.addEventListener('message', initListener);
+    this.worker = new Worker(new URL('./localContractWorker.ts', import.meta.url), { type: 'module' });
+    this.worker.addEventListener('message', initListener);
     // Wrap the worker with Comlink to enable direct method invocation
-    this.remoteApi = Comlink.wrap(worker);
+    this.remoteApi = Comlink.wrap(this.worker);
     this.initialized = false;
   }
 

@@ -122,9 +122,9 @@ interface Star_Enrty {
 //     ],
 // }
 interface Fingerprint_Index_Entry {	// fingerprint_index_entry
-	pure_text_fingerprint: Array<CID_Str>,  // cid-> Pure_Text_Fingerprint
-    code_section_fingerprint: Array<CID_Str>, // cid-> Code_Section_Fingerprint
-    image_fingerprint: Array<CID_Str>, // cid-> Image_Fingerprint
+	pure_text_fingerprint: Record<Knowledge_ID, CID_Str>,  // cid-> Pure_Text_Fingerprint
+    code_section_fingerprint: Record<Knowledge_ID, CID_Str>, // cid-> Code_Section_Fingerprint
+    image_fingerprint: Record<Knowledge_ID, CID_Str>, // cid-> Image_Fingerprint
 }
 
 

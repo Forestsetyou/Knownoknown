@@ -28,7 +28,7 @@ async function PHash(imageData: Buffer, imageName: string): Promise<string | nul
     }
 }
 
-function imageSimilarity(hashA: string, hashB: string): number {
+function ImageSimilarity(hashA: string, hashB: string): number {
     let distance = 0;
     for (let i = 0; i < hashA.length; i++) {
         if (hashA[i] !== hashB[i]) distance++;
@@ -36,8 +36,8 @@ function imageSimilarity(hashA: string, hashB: string): number {
     return distance;
 }
 
-function imageScore(distance: number): number {
+function ImageScore(distance: number): number {
     return Math.round((distance / MAX_DISTANCE) * 1000)/10;
 }
 
-export { PHash, imageSimilarity, imageScore };
+export { PHash, ImageSimilarity, ImageScore };

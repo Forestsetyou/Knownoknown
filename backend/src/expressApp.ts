@@ -4,12 +4,13 @@ import { TrustlessGatewayCarOptions, TrustlessGatewayRawOptions, trustlessGatewa
 import { TrustlessGatewayResponseHeaders } from './interface/trustlessGateway/trustlessGatewayInterface.js';
 import { KnowledgeDBServer } from './knowledgeDBServer.js';
 import { KnownoknownLocalContractServer } from './interface/knownoknownContract/knownoknownLocalContractServer.js';
+import { writeFileSync } from 'fs';
 
 const adminServerCorsOptions = {    // 管理员服务器 CORS 选项
     origin: '*',
-    methods: ['GET', 'POST'],
-    // allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-    credentials: true,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    // credentials: true,
 }
 
 function setHeaders(res: express.Response, headers: TrustlessGatewayResponseHeaders) {
@@ -94,6 +95,57 @@ export class ExpressApp {
                 version: '1.0.0'
             })
         })
+        this.app.options('/admin/extract-fingerprint', cors(adminServerCorsOptions));
+        // this.app.post('/admin/extract-fingerprint', cors(adminServerCorsOptions), async (req, res) => {
+        //     try {
+        //         if (!req.body || !req.body.knowledge_data_car) {
+        //             console.log("req.body", req.body);
+        //             return res.status(400).json({
+        //                 success: false,
+        //                 error: 'no knowledge data car provided'
+        //             })
+        //         }
+        //         writeFileSync('body.json', JSON.stringify(req.body, null, 2));
+        //         const knowledgeDataCarBytes = Uint8Array.from(req.body.knowledge_data_car);
+        //         const fingerprintDataCarBytes = await this.knowledgeDB.extractFingerprintDataFromKnowledgeDataCar(knowledgeDataCarBytes);
+        //         res.json({
+        //             success: true,
+        //             fingerprintDataCarBytes: fingerprintDataCarBytes
+        //         })
+        //     } catch (error) {
+        //         console.log("error:", error);
+        //         res.json({
+        //             success: false,
+        //             error: 'failed to extract fingerprint data'
+        //         })
+        //     }
+        // })
+        this.app.post('/admin/extract-fingerprint', 
+            cors(adminServerCorsOptions),
+            // 禁用 bodyParser 以直接处理二进制流
+            express.raw({ type: 'application/octet-stream', limit: '500mb' }),
+            async (req, res) => {
+              try {
+                if (!req.body || req.body.length === 0) {
+                  return res.status(400).json({ success: false, error: 'Empty payload' });
+                }
+          
+                // 直接获取 Uint8Array
+                const knowledgeDataCarBytes = new Uint8Array(req.body);
+                
+                // 处理数据
+                const fingerprintDataCarBytes = 
+                  await this.knowledgeDB.extractFingerprintDataFromKnowledgeDataCar(knowledgeDataCarBytes);
+          
+                // 返回二进制响应
+                res.setHeader('Content-Type', 'application/octet-stream');
+                res.end(Buffer.from(fingerprintDataCarBytes));
+              } catch (error) {
+                console.error("Processing error:", error);
+                res.status(500).json({ success: false, error: error.message });
+              }
+            }
+          );
         // this.app.get('/admin/contractTest', cors(adminServerCorsOptions), async (req, res) => {
         //     const result = await this.knownoknownLocalContractServer.contractTest();
         //     if (result) {

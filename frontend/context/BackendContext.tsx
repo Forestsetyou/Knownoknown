@@ -6,6 +6,7 @@ import { LocalBackendService, BackendServerStatus, BackendServiceStatus } from '
 interface BackendContextType {
     backendStatus: BackendServiceStatus;
     getBackendStatus: () => Promise<BackendServiceStatus>;
+    backendExtractFingerprintData: (knowledgeDataCarBytes: Uint8Array) => Promise<Uint8Array>;
 }
 
 const BackendContext = createContext<BackendContextType | undefined>(undefined);
@@ -20,7 +21,7 @@ const defaultBackendStatus : BackendServiceStatus = {
 
 const BackendProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [backendStatus, setBackendStatus] = useState<BackendServiceStatus>(defaultBackendStatus);
-    const [localBackendService, setLocalBackendService] = useState<LocalBackendService>(new LocalBackendService());
+    const [localBackendService, setLocalBackendService] = useState<LocalBackendService | undefined>(undefined);
   
     // for initialization
     const [initialized, setInitialized] = useState(false);
@@ -31,30 +32,49 @@ const BackendProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     let backendStatusChecker: StatusChecker | null = null;
     
     const getBackendStatus = async () => {
-        const backendStatus = await localBackendService.getBackendStatus();
-        setBackendStatus(backendStatus);
-        return backendStatus;
+      const backendStatus = await localBackendService!.getBackendStatus();
+      setBackendStatus(backendStatus);
+      return backendStatus;
     }
+
+    // 设置定时器
+    useEffect(() => {
+      if (localBackendService) {
+        backendStatusChecker = setInterval(getBackendStatus, 60000); // 60秒更新一次后端服务状态
+      }
+      return () => {
+        if (backendStatusChecker) {
+          clearInterval(backendStatusChecker);
+        }
+      };
+    }, [localBackendService]);
 
     // 初始化
     useEffect(() => {
         const init = async () => {
             setInitializationStatus('初始化后端服务...')
-            await getBackendStatus();
-            backendStatusChecker = setInterval(getBackendStatus, 60000); // 60秒更新一次后端服务状态
+            const localBackendService = new LocalBackendService();
+            setLocalBackendService(localBackendService);
+            const backendStatus = await localBackendService.getBackendStatus();
+            setBackendStatus(backendStatus);
             setInitialized(true);
         }
         if (!initialized) {
             init()
         }
     }, []);
+
+    const extractFingerprintData = async (knowledgeDataCarBytes: Uint8Array) => {
+        const fingerprintDataCarBytes = await localBackendService!.extractFingerprintData(knowledgeDataCarBytes);
+        return fingerprintDataCarBytes;
+    }
     
     // 如果系统尚未初始化，显示加载中
     if (!initialized) {
       return (
         <Container className="d-flex align-items-center justify-content-center" style={{ minHeight: "50vh" }}>
           <div className="text-center">
-            <h4>钱包服务</h4>
+            <h4>后端服务</h4>
             
             {initError ? (
               <Alert variant="danger" className="mt-3">
@@ -86,6 +106,7 @@ const BackendProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         value={{ 
           backendStatus: backendStatus, 
           getBackendStatus, 
+          backendExtractFingerprintData: extractFingerprintData,
         }}
       >
         {children}

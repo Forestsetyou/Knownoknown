@@ -15,6 +15,7 @@ interface BackendServiceStatus {
 enum backendUrl {
   BASE_URL="http://localhost:12891",
   ROUTER_STATUS="/admin/status",
+  ROUTER_EXTRACT_FINGERPRINT="/admin/extract-fingerprint",
 }
 
 const TIMEOUT = 10000;  // 10 seconds
@@ -81,6 +82,21 @@ class LocalBackendService {
         }
         return backendServiceStatus;
     }
+  }
+
+  async extractFingerprintData(knowledgeDataCarBytes: Uint8Array) {
+    const extractFingerprintData_url = backendUrl.BASE_URL+backendUrl.ROUTER_EXTRACT_FINGERPRINT;
+    const rep = await fetch(extractFingerprintData_url, {
+      method: "POST",
+      body: knowledgeDataCarBytes,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+      },
+      signal: AbortSignal.timeout(TIMEOUT),
+    })
+    if (!rep.ok) throw new Error(await rep.text());
+    const fingerprintDataCarBytes = new Uint8Array(await rep.arrayBuffer());
+    return fingerprintDataCarBytes;
   }
 }
 

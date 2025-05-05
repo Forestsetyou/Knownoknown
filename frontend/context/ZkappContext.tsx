@@ -22,7 +22,7 @@ const defaultZkappStatus : ZkappStatus = {
 
 const ZkappProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [zkappStatus, setZkappStatus] = useState<ZkappStatus>(defaultZkappStatus);
-    const [localZkappService, setLocalZkappService] = useState<LocalZkappService>(new LocalZkappService());
+    const [localZkappService, setLocalZkappService] = useState<LocalZkappService | undefined>(undefined);
 
     // sync with backend status
     const { backendStatus, getBackendStatus } = useBackend();
@@ -35,19 +35,24 @@ const ZkappProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     // 定时检查合约状态
     let zkappFieldChecker: StatusChecker | null = null;
 
-    const getZkappFields = async () => {
-      const zkappFields = await localZkappService.getZkappFields();
-      setZkappStatus((prev:any) => ({
-        ...prev,
-        zkappFields
-      }));
-      return zkappFields;
-    }
-    
+    // 设置定时器
+    useEffect(() => {
+      if (localZkappService) {
+        zkappFieldChecker = setInterval(getZkappFields, 60000); // 60秒更新一次合约状态
+      }
+      return () => {
+        if (zkappFieldChecker) {
+          clearInterval(zkappFieldChecker);
+        }
+      };
+    }, [localZkappService]);
+
     // 初始化
     useEffect(() => {
         const init = async () => {
             setInitializationStatus('初始化合约服务...')
+            const localZkappService = new LocalZkappService();
+            setLocalZkappService(localZkappService);
             await localZkappService.initThread();
             const contractAddress = backendStatus.contractAddress;
             await localZkappService.initZkapp(contractAddress);
@@ -58,16 +63,24 @@ const ZkappProvider: React.FC<{children: ReactNode}> = ({ children }) => {
               contractAddress,
               zkappFields
             });
-            zkappFieldChecker = setInterval(getZkappFields, 60000); // 60秒更新一次IPFS状态
             setInitialized(true);
         }
         if (!initialized) {
             init()
         }
     }, []);
+
+    const getZkappFields = async () => {
+      const zkappFields = await localZkappService!.getZkappFields();
+      setZkappStatus((prev:any) => ({
+        ...prev,
+        zkappFields
+      }));
+      return zkappFields;
+    }
     
     const compileZkapp = async () => {
-      await localZkappService.compileZkapp();
+      await localZkappService!.compileZkapp();
       setZkappStatus((prev:any) => ({
         ...prev,
         compileStatus: true
@@ -79,7 +92,7 @@ const ZkappProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       return (
         <Container className="d-flex align-items-center justify-content-center" style={{ minHeight: "50vh" }}>
           <div className="text-center">
-            <h4>钱包服务</h4>
+            <h4>合约服务</h4>
             
             {initError ? (
               <Alert variant="danger" className="mt-3">
