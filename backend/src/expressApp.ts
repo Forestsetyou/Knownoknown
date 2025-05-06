@@ -4,12 +4,14 @@ import { TrustlessGatewayCarOptions, TrustlessGatewayRawOptions, trustlessGatewa
 import { TrustlessGatewayResponseHeaders } from './interface/trustlessGateway/trustlessGatewayInterface.js';
 import { KnowledgeDBServer } from './knowledgeDBServer.js';
 import { KnownoknownLocalContractServer } from './interface/knownoknownContract/knownoknownLocalContractServer.js';
+import { Notice_Record } from './interface/knownoknownDag/knownoknownDagInterface.js';
 import { writeFileSync } from 'fs';
+import { CID } from 'multiformats/cid';
 
 const adminServerCorsOptions = {    // 管理员服务器 CORS 选项
     origin: '*',
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    // allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     // credentials: true,
 }
 
@@ -31,12 +33,16 @@ export class ExpressApp {
     private knowledgeDB: KnowledgeDBServer;
     private reqCount: number;
     private knownoknownLocalContractServer: KnownoknownLocalContractServer;
+    private knowledgeLock: boolean;
+    private applicationLock: boolean;
 
     constructor() {
         this.app = express();
         this.knowledgeDB = new KnowledgeDBServer();
         this.reqCount = 0;
         this.knownoknownLocalContractServer = new KnownoknownLocalContractServer();
+        this.knowledgeLock = false;
+        this.applicationLock = false;
     }
 
     public async init() {
@@ -81,9 +87,27 @@ export class ExpressApp {
             next()
         })
     }
+
+    private lockKnowledge() {
+        this.knowledgeLock = true;
+    }
+
+    private unlockKnowledge() {
+        this.knowledgeLock = false;
+    }
+
+    private lockApplication() {
+        this.applicationLock = true;
+    }
+
+    private unlockApplication() {
+        this.applicationLock = false;
+    }
     
     // routers for admin server
     private async initAdminServer() {
+        // this.app.options('/admin/extract-fingerprint', cors(adminServerCorsOptions));
+        this.app.options('*', cors(adminServerCorsOptions));
         this.app.get('/admin/status', cors(adminServerCorsOptions), async (req, res) => {
             res.json({
                 success: true,
@@ -92,34 +116,13 @@ export class ExpressApp {
                 ipfsStatusFlagCID: (await this.knowledgeDB.getStatusFlagCID()).toString(),
                 knownoknownEntryCID: (await this.knowledgeDB.getKnownoknown_Entry_CID()).toString(),
                 contractAddress: (await this.knownoknownLocalContractServer.getLocalContractAddress()).toBase58(),
+                contractLock: {
+                    knowledge: this.knownoknownLocalContractServer.isKnowledgeLocked(),
+                    application: this.knownoknownLocalContractServer.isApplicationLocked(),
+                },
                 version: '1.0.0'
             })
         })
-        this.app.options('/admin/extract-fingerprint', cors(adminServerCorsOptions));
-        // this.app.post('/admin/extract-fingerprint', cors(adminServerCorsOptions), async (req, res) => {
-        //     try {
-        //         if (!req.body || !req.body.knowledge_data_car) {
-        //             console.log("req.body", req.body);
-        //             return res.status(400).json({
-        //                 success: false,
-        //                 error: 'no knowledge data car provided'
-        //             })
-        //         }
-        //         writeFileSync('body.json', JSON.stringify(req.body, null, 2));
-        //         const knowledgeDataCarBytes = Uint8Array.from(req.body.knowledge_data_car);
-        //         const fingerprintDataCarBytes = await this.knowledgeDB.extractFingerprintDataFromKnowledgeDataCar(knowledgeDataCarBytes);
-        //         res.json({
-        //             success: true,
-        //             fingerprintDataCarBytes: fingerprintDataCarBytes
-        //         })
-        //     } catch (error) {
-        //         console.log("error:", error);
-        //         res.json({
-        //             success: false,
-        //             error: 'failed to extract fingerprint data'
-        //         })
-        //     }
-        // })
         this.app.post('/admin/extract-fingerprint', 
             cors(adminServerCorsOptions),
             // 禁用 bodyParser 以直接处理二进制流
@@ -134,8 +137,7 @@ export class ExpressApp {
                 const knowledgeDataCarBytes = new Uint8Array(req.body);
                 
                 // 处理数据
-                const fingerprintDataCarBytes = 
-                  await this.knowledgeDB.extractFingerprintDataFromKnowledgeDataCar(knowledgeDataCarBytes);
+                const fingerprintDataCarBytes = await this.knowledgeDB.extractFingerprintDataFromKnowledgeDataCar(knowledgeDataCarBytes);
           
                 // 返回二进制响应
                 res.setHeader('Content-Type', 'application/octet-stream');
@@ -146,6 +148,122 @@ export class ExpressApp {
               }
             }
           );
+          this.app.post('/admin/publish-knowledge', 
+              cors(adminServerCorsOptions),
+              // 禁用 bodyParser 以直接处理二进制流
+              express.raw({ type: 'application/octet-stream', limit: '500mb' }),
+              async (req, res) => {
+                try {
+                  if (!req.body || req.body.length === 0) {
+                    return res.status(400).json({ success: false, error: 'Empty payload' });
+                  }
+                  if (this.knowledgeLock) {
+                      return res.status(400).json({ success: false, error: 'Knowledge is locked' });
+                  }
+                  this.lockKnowledge();
+
+                  // 获取旧的 merkle root
+                  const contractAddress = (await this.knownoknownLocalContractServer.getLocalContractAddress()).toBase58();
+                  const oldFields = await this.knownoknownLocalContractServer.getContractFields(contractAddress);
+                  const oldMerkleRoot = oldFields.knowledgeEntryMerkleRoot;
+                  const publishedCIDHash = oldFields.publishKnowledgeCidHash;
+
+                  // 直接获取 Uint8Array
+                  const knowledgeCheckPackCarBytes = new Uint8Array(req.body);
+
+                  // 处理数据
+                  const { success, noticeRecord, newMerkleRoot, newDagProver } = await this.knowledgeDB.publishKnowledge(knowledgeCheckPackCarBytes, publishedCIDHash);
+                  if (!success) {
+                    this.unlockKnowledge();
+                    res.status(400).json({ success: false, error: 'knowledge CIDHash不匹配' });
+                    return;
+                  }
+                  
+                  // 提交发布
+                  await this.knownoknownLocalContractServer.provePublish('knowledge', newDagProver, newMerkleRoot);
+
+                  // 发布成功的回调更新
+                  await this.knowledgeDB.addUserNotice(noticeRecord);
+                  this.unlockKnowledge();
+                  res.json({ success: true, newMerkleRoot: newMerkleRoot.toString(), oldMerkleRoot: oldMerkleRoot});
+                } catch (error) {
+                  console.error("Processing error:", error);
+                  this.knownoknownLocalContractServer.unlockKnowledge();
+                  res.status(500).json({ success: false, error: error.message });
+                }
+              }
+            );
+            this.app.post('/admin/tempImg/set', 
+                cors(adminServerCorsOptions),
+                // 禁用 bodyParser 以直接处理二进制流
+                express.raw({ type: 'application/octet-stream', limit: '500mb' }),
+                async (req, res) => {
+                  try {
+                    if (!req.body || req.body.length === 0) {
+                      return res.status(400).json({ success: false, error: 'Empty payload' });
+                    }
+  
+                    // 直接获取 Uint8Array
+                    const tempImgPackCarBytes = new Uint8Array(req.body);
+  
+                    // 处理数据
+                    const { success, cid } = await this.knowledgeDB.addTempImgPack(tempImgPackCarBytes);
+                    if (!success) {
+                      res.status(500).json({ success: false, error: 'add temp img pack failed' });
+                      return;
+                    }
+                    res.json({ success: true, cid: cid });
+                  } catch (error) {
+                    console.error("Processing error:", error);
+                    res.status(500).json({ success: false, error: error.message });
+                  }
+                }
+              );
+              
+              this.app.get('/admin/tempImg/del/:cid', 
+                cors(adminServerCorsOptions),
+                async (req, res) => {
+                  try {
+                    const cidStr = req.params.cid;
+                    const cid = CID.parse(cidStr);
+                    if (!(await this.knowledgeDB.blockHas(cid))) {
+                        res.status(404).json({ success: false, error: 'CID for temp img pack not found' });
+                        return;
+                    }
+                    const success = await this.knowledgeDB.removeTempImgPack(cid);
+                    if (!success) {
+                        res.status(500).json({ success: false, error: 'remove temp img pack failed' });
+                        return;
+                    }
+                    res.json({ success: true });
+                  } catch (error) {
+                    console.error("Processing error:", error);
+                    res.status(500).json({ success: false, error: error.message });
+                  }
+                }
+              );
+
+            this.app.get('/admin/tempImg/get/:cid', 
+                cors(adminServerCorsOptions),
+                async (req, res) => {
+                  try {
+                    const cidStr = req.params.cid;
+                    const cid = CID.parse(cidStr);
+                    if (!(await this.knowledgeDB.blockHas(cid))) {
+                        res.status(404).json({ success: false, error: 'CID not found' });
+                        return;
+                    }
+                    const imgBytes = await this.knowledgeDB.fsCatBytes(cid);
+                    res.setHeader('Content-Type', 'image/jpeg');
+                    res.setHeader('Content-Length', imgBytes.length);
+                    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+                    res.send(imgBytes);
+                  } catch (error) {
+                    console.error("Processing error:", error);
+                    res.status(500).json({ success: false, error: error.message });
+                  }
+                }
+              );
         // this.app.get('/admin/contractTest', cors(adminServerCorsOptions), async (req, res) => {
         //     const result = await this.knownoknownLocalContractServer.contractTest();
         //     if (result) {
@@ -212,6 +330,7 @@ export class ExpressApp {
             }
         })
         this.app.post('/contract/method/publish', cors(adminServerCorsOptions), async (req, res) => {
+            console.log("publish", req.body);
             const type = req.body.type;
             if ((type !== 'knowledge' && type !== 'application')) {
                 res.json({

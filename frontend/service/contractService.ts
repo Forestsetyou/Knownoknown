@@ -66,6 +66,26 @@ class LocalZkappService {
     const zkappFieldsStatus = Object.entries(zkappFields).map(([k, v]) => [k, Field.fromJSON(v as string)]);
     return Object.fromEntries(zkappFieldsStatus) as any;
   }
+
+  async encryptKey(key: Uint8Array, nonce: Uint8Array, publicKeyStr: string) {
+    return this.remoteApi.encryptKey(key, nonce, publicKeyStr);
+  }
+
+  async decryptKey(serializedEncryptedKey: any, serializedEncryptedNonce: any, privateKeyStr: string) {
+    return this.remoteApi.decryptKey(serializedEncryptedKey, serializedEncryptedNonce, privateKeyStr);
+  }
+  
+  async publishToContract(type: string, publishCid: string, privateKeyStr: string) {
+    return this.remoteApi.publishToContract(type, publishCid, privateKeyStr);
+  }
+
+  async waitPublishToContract() {
+    return this.remoteApi.waitPublishToContract();
+  }
+
+  async waitMerkleRoot(type: 'knowledge' | 'application', oldMerkleRoot: string, newMerkleRoot: string) {
+    return this.remoteApi.waitMerkleRoot(type, oldMerkleRoot, newMerkleRoot);
+  }
 }
 
 const ZkappContext = createContext<LocalZkappService | undefined>(undefined);

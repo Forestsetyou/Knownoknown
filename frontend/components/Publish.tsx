@@ -1,28 +1,47 @@
 'use client';
 
-import React, { useState, useEffect, useContext } from 'react';
-import { Container, Tabs, Tab, Card, Button, Spinner, Alert } from 'react-bootstrap';
-import { FaFileImport, FaFileExport, FaArrowRight, FaArrowLeft, FaWallet, FaExclamationTriangle } from 'react-icons/fa';
+import React, { useState, useEffect, useContext, useRef } from 'react';
+import { Container, Tabs, Tab, Card, Button, Spinner, Alert, Modal } from 'react-bootstrap';
+import { FaFileImport, FaFileExport, FaArrowRight, FaArrowLeft, FaWallet, FaExclamationTriangle, FaRedo } from 'react-icons/fa';
 import PublishMetadata from '@/components/publish/PublishMetadata';
 import PublishChapters from '@/components/publish/PublishChapters';
 import PublishIntro from '@/components/publish/PublishIntro';
 import PublishReport from '@/components/publish/PublishReport';
 import { WalletStatus, useWallet } from '@/context/WalletContext';
 import { useIpfs } from '@/context/IpfsContext';
+import { saveWithFileSystemAPI } from '@/interface/utils';
+import { useZkapp } from '@/context/ZkappContext';
+import { useModal } from '@/context/ModalContext';
+import { useBackend } from '@/context/BackendContext';
 export default function PublishPage() {
   // 当前活动的标签页
   const [activeTab, setActiveTab] = useState('basic-info');
   
   // IPFS服务
-  const { ipfsStatus, getIpfsStatus, ipfsCreateNewKnowledge, ipfsGetKnowledgeMetadata, ipfsSetKnowledgeMetadata } = useIpfs();
+  const { ipfsCreateNewKnowledge, ipfsExportKnowledgeCheckPackManager, ipfsImportKnowledgeCheckPackManager, ipfsCheckKnowledgeBuilded, ipfsTestFucntion, ipfsGetKnowledgePublishCID, ipfsGetKnowledgeCheckPackCarBytes } = useIpfs();
+  
+  // 模态框服务
+  const { showConfirm, showError, showSuccess, hideModal, showLoading } = useModal();
   
   // 钱包服务
-  const { walletStatus, connectWallet, disconnectWallet, validateWalletPrivateKey, setWalletKey } = useWallet();
+  const { walletStatus, connectWallet, getWalletKey } = useWallet();
+
+  // 智能合约服务
+  const { zkappStatus, zkappPublishToContract, zkappWaitPublishToContract, zkappWaitMerkleRoot, getZkappFields } = useZkapp();
+
+  // 后端服务
+  const { backendPublishKnowledge } = useBackend();
+
+
   const [localWalletStatus, setLocalWalletStatus] = useState<WalletStatus>(walletStatus);
   
   // 页面加载状态
   const [walletConnected, setWalletConnected] = useState(walletStatus.connected);
   const [pageLoading, setPageLoading] = useState(true);
+  const [resetting, setResetting] = useState(false);
+
+  // 文件输入Ref
+  const workflowInputRef = useRef<HTMLInputElement>(null);
   
   const initializeNewKnowledge = async () => {
     setPageLoading(true);
@@ -56,11 +75,6 @@ export default function PublishPage() {
     }
   }, [walletStatus]);
   
-  // 处理页面刷新
-  const handleRefreshPage = () => {
-    initializeNewKnowledge();
-  };
-  
   // 处理下一步按钮点击
   const handleNextStep = () => {
     // 根据当前标签页确定下一个标签页
@@ -85,27 +99,129 @@ export default function PublishPage() {
     }
   };
   
+  const handleImportWorkflowClick = () => {
+    workflowInputRef.current?.click(); // 通过Ref触发隐藏的input
+  }
+
   // 处理工作流导入
-  const handleImportWorkflow = () => {
-    // 模拟导入功能
-    console.log('导入工作流');
-    // 这里可以添加文件选择器和导入逻辑
+  const handleImportWorkflow = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setPageLoading(true);
+      // 方法1：使用现代API（推荐）
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      await ipfsImportKnowledgeCheckPackManager(uint8Array);
+      console.log('文件二进制数据:', uint8Array);
+      setPageLoading(false);
+    } catch (err) {
+      console.error('文件读取失败:', err);
+    }
   };
   
   // 处理工作流导出
-  const handleExportWorkflow = () => {
-    // 模拟导出功能
-    console.log('导出工作流');
-    // 这里可以添加导出逻辑
+  const handleExportWorkflow = async () => {
+    const { carName, carBytes } = await ipfsExportKnowledgeCheckPackManager();
+    console.log(carName, carBytes.length);
+    try {
+      await saveWithFileSystemAPI(carBytes, carName, window);
+    } catch (error) {
+      console.error('导出工作流失败:', error);
+    }
+  };
+  
+  // 处理重置工作流
+  const handleResetWorkflow = async () => {
+    showConfirm('确定要重置当前工作流吗？这将清除所有未保存的内容。', '重置工作流', async () => {
+        try {
+          setResetting(true);
+          await ipfsCreateNewKnowledge(localWalletStatus.address);
+          // await ipfsTestFucntion();
+          console.log('重置工作流成功');
+          setActiveTab('basic-info'); // 重置后返回第一个标签页
+        } catch (error) {
+          console.error('重置工作流失败:', error);
+        } finally {
+          setResetting(false);
+          hideModal();
+        }
+      },
+      () => {
+        console.log('取消重置工作流');
+        setResetting(false);
+        hideModal();
+      }
+    )
   };
   
   // 处理完成发布
   const handleFinishPublish = async () => {
     try {
+      setPageLoading(true);
+      const builded = await ipfsCheckKnowledgeBuilded();
+      
+      if (!builded) {
+        setPageLoading(false);
+        showError("请完成知识构建后再发布知识实体。", "发布失败");
+        return;
+      }
+
+      const privateKey = await getWalletKey();
+      if (!privateKey) {
+        setPageLoading(false);
+        showError("请先设置钱包密钥。", "发布失败");
+        return;
+      }
+
+      // const compiledStatus = zkappStatus.compileStatus;
+      // if (!compiledStatus) {
+      //   setPageLoading(false);
+      //   showError("请先编译合约。", "发布失败");
+      //   return;
+      // }
+
+      const zkappFileds = await getZkappFields();
+      const knowledgePublishField = zkappFileds.publishKnowledgeCidHash.toString();
+      if (knowledgePublishField !== '0') {
+        setPageLoading(false);
+        showError("合约发布申请状态被占用，请稍后再试，建议保存工作流", "发布失败");
+        return;
+      }
+      
+      const knowledgePublishCID = await ipfsGetKnowledgePublishCID();
+      const publishTime = await zkappPublishToContract('knowledge', knowledgePublishCID, privateKey);
+      const waitPublish = await zkappWaitPublishToContract();
+      if (!waitPublish) {
+        setPageLoading(false);
+        showError("发布申请提交失败，合约状态未能更新", "发布失败");
+        return;
+      }
+      const knowledgeCheckPackCarBytes = await ipfsGetKnowledgeCheckPackCarBytes();
+      const {success, newMerkleRoot, oldMerkleRoot} = await backendPublishKnowledge(knowledgeCheckPackCarBytes);
+      if (!success) {
+        setPageLoading(false);
+        showError("发布失败，请检查知识是否合法!", "发布失败");
+        return;
+      }
+
+      const waitMerkleRoot = await zkappWaitMerkleRoot('knowledge', oldMerkleRoot, newMerkleRoot);
+      if (!waitMerkleRoot) {
+        setPageLoading(false);
+        showError("发布失败，这是不该出现的情况!", "发布失败");
+        return;
+      }
+
       // 这里添加发布逻辑
       console.log('完成发布');
+
+      showSuccess("您的知识已成功发布！", "发布成功");
+      setPageLoading(false);
     } catch (error) {
       console.error('发布失败:', error);
+      setPageLoading(false);
+      showError("知识发布过程中发生错误，请稍后重试。", "发布失败");
     }
   };
   
@@ -137,6 +253,15 @@ export default function PublishPage() {
               </ul>
             </Alert>
           </div>
+          <Button 
+            variant="primary" 
+            size="lg" 
+            className="d-flex align-items-center"
+            onClick={connectWallet}
+          >
+            <FaWallet className="me-2" />
+            连接钱包
+          </Button>
         </div>
       </Container>
     );
@@ -147,34 +272,62 @@ export default function PublishPage() {
     return (
       <Container className="py-5">
         <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '60vh' }}>
-          <Spinner animation="border" variant="danger" className="mb-3" style={{ width: '3rem', height: '3rem' }} />
-          <h5 className="text-muted mb-2">正在初始化知识发布环境</h5>
-          <p className="text-muted">请稍候...</p>
+          <Spinner animation="border" variant="danger" className="mb-3" />
+          <p className="text-muted">正在初始化知识发布页面...</p>
+        </div>
+      </Container>
+    );
+  }
+  
+  // 如果正在重置工作流，显示重置状态
+  if (resetting) {
+    return (
+      <Container className="py-5">
+        <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '60vh' }}>
+          <Spinner animation="border" variant="warning" className="mb-3" />
+          <p className="text-muted">正在重置工作流...</p>
         </div>
       </Container>
     );
   }
   
   return (
-    <Container className="py-2">
-      {/* 标题和工作流管理区域 */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h4 className="mb-0">发布新知识</h4>
-        <div>
+    <Container className="py-4">
+      {/* 隐藏的文件输入 */}
+      <input
+        type="file"
+        ref={workflowInputRef}
+        style={{ display: 'none' }}
+        accept=".car"
+        onChange={handleImportWorkflow}
+      />
+      
+      {/* 工作流管理 */}
+      <div className="d-flex justify-content-end mb-3">
+        <div className="d-flex gap-2">
           <Button 
             variant="outline-secondary" 
-            className="me-2"
-            onClick={handleImportWorkflow}
+            className="d-flex align-items-center"
+            onClick={handleImportWorkflowClick}
           >
             <FaFileImport className="me-2" />
             导入工作流
           </Button>
           <Button 
-            variant="outline-secondary"
+            variant="outline-secondary" 
+            className="d-flex align-items-center"
             onClick={handleExportWorkflow}
           >
             <FaFileExport className="me-2" />
             导出工作流
+          </Button>
+          <Button 
+            variant="outline-warning" 
+            className="d-flex align-items-center"
+            onClick={handleResetWorkflow}
+          >
+            <FaRedo className="me-2" />
+            重置工作流
           </Button>
         </div>
       </div>
@@ -297,7 +450,7 @@ export default function PublishPage() {
                 onClick={handleFinishPublish}
                 className="d-flex align-items-center"
               >
-                完成发布
+                发布知识
               </Button>
             </Card.Footer>
           </>

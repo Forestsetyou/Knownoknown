@@ -15,7 +15,7 @@ function TextSimilarity(hash1: string, hash2: string): number {
 }
 
 function TextScore(distance: number): number {
-    const half_distance = (distance+32 > 64) ? 64 : distance+32;
+    const half_distance = (distance*2 > 64) ? 64 : distance*2;
     return Math.round((half_distance / HASH_BITS) * 1000)/10;
 }
 

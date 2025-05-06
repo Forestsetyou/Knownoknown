@@ -75,9 +75,100 @@ class KnownoknownLocalContractServer {
     private contractAccount: MinaAccount;
     private testUserAccounts: MinaAccount[];
     private zkApp: KnownoknownContract;
+    private knowledgeLock: boolean;
+    private applicationLock: boolean;
 
     constructor() {
         this.proofsEnabled = false;
+        this.knowledgeLock = false;
+        this.applicationLock = false;
+    }
+
+    lockKnowledge() {
+        this.knowledgeLock = true;
+    }
+
+    lockApplication() {
+        this.applicationLock = true;
+    }
+
+    unlockKnowledge() {
+        this.knowledgeLock = false;
+    }
+
+    unlockApplication() {
+        this.applicationLock = false;
+    }
+
+    isKnowledgeLocked() {
+        return this.knowledgeLock;
+    }
+
+    isApplicationLocked() {
+        return this.applicationLock;
+    }
+
+    async checkPublish(type: 'knowledge' | 'application', newMerkleRoot: Field) {
+        switch (type) {
+            case 'knowledge': {
+                while (!(this.zkApp.knowledgeEntryMerkleRoot.get().equals(newMerkleRoot).toBoolean())) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));    // 每1秒检查一次
+                }
+                this.unlockKnowledge();
+                return true;
+            }
+            case 'application': {
+                while (!(this.zkApp.applicationEntryMerkleRoot.get().equals(newMerkleRoot).toBoolean())) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));    // 每1秒检查一次
+                }
+                this.unlockApplication();
+                return true;
+            }
+        }
+    }
+
+    async provePublish(type: 'knowledge' | 'application', dagProver: DAGProver, newMerkleRoot: Field) {
+        let txn:any;
+        switch (type) {
+            case 'knowledge':
+                this.lockKnowledge();
+                txn = await Mina.transaction(this.adminAccount.publicKey, async () => {
+                    await this.zkApp.proveKnowledgePublish(dagProver);
+                });
+                break;
+            case 'application':
+                this.lockApplication();
+                txn = await Mina.transaction(this.adminAccount.publicKey, async () => {
+                    await this.zkApp.proveApplicationPublish(dagProver);
+                });
+                break;
+            default:
+                throw new Error("invalid type");
+        }
+        await txn.prove();
+        await txn.sign([this.adminAccount.privateKey]).send();
+        await this.checkPublish(type, newMerkleRoot);
+        return true;
+    }
+
+    async resetPublish(type: 'knowledge' | 'application') {
+        let resetTxn:any;
+        switch (type) {
+            case 'knowledge':
+                resetTxn = await Mina.transaction(this.adminAccount.publicKey, async () => {
+                    await this.zkApp.resetKnowledgePublish();
+                });
+                break;
+            case 'application':
+                resetTxn = await Mina.transaction(this.adminAccount.publicKey, async () => {
+                    await this.zkApp.resetApplicationPublish();
+                });
+                break;
+            default:
+                throw new Error("invalid type");
+        }
+        await resetTxn.prove();
+        await resetTxn.sign([this.adminAccount.privateKey]).send();
     }
 
     async initLocalAccounts() {

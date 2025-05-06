@@ -7,6 +7,10 @@ interface BackendContextType {
     backendStatus: BackendServiceStatus;
     getBackendStatus: () => Promise<BackendServiceStatus>;
     backendExtractFingerprintData: (knowledgeDataCarBytes: Uint8Array) => Promise<Uint8Array>;
+    backendPublishKnowledge: (knowledgeCheckPackCarBytes: Uint8Array) => Promise<{success: boolean, newMerkleRoot: string, oldMerkleRoot: string}>;
+    backendSetTempImgPack: (tempImgPackCarBytes: Uint8Array) => Promise<{success: boolean, cid: string}>;
+    backendDelTempImgPack: (tempImgPackCid: string) => Promise<{success: boolean}>;
+    backendGetTempImgTempLinks: (images: any) => Promise<any>;
 }
 
 const BackendContext = createContext<BackendContextType | undefined>(undefined);
@@ -68,7 +72,27 @@ const BackendProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         const fingerprintDataCarBytes = await localBackendService!.extractFingerprintData(knowledgeDataCarBytes);
         return fingerprintDataCarBytes;
     }
-    
+
+    const publishKnowledge = async (knowledgeCheckPackCarBytes: Uint8Array) => {
+        const {success, newMerkleRoot, oldMerkleRoot} = await localBackendService!.publishKnowledge(knowledgeCheckPackCarBytes);
+        return {success, newMerkleRoot, oldMerkleRoot};
+    }
+
+    const setTempImgPack = async (tempImgPackCarBytes: Uint8Array) => {
+        const {success, cid} = await localBackendService!.setTempImgPack(tempImgPackCarBytes);
+        return {success, cid};
+    }
+
+    const delTempImgPack = async (tempImgPackCid: string) => {
+        const {success} = await localBackendService!.delTempImgPack(tempImgPackCid);
+        return {success};
+    }
+
+    const getTempImgTempLinks = async (images: any) => {
+        const tempImgTempLinks = await localBackendService!.getTempImgTempLinks(images);
+        return tempImgTempLinks;
+    }
+
     // 如果系统尚未初始化，显示加载中
     if (!initialized) {
       return (
@@ -107,6 +131,10 @@ const BackendProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           backendStatus: backendStatus, 
           getBackendStatus, 
           backendExtractFingerprintData: extractFingerprintData,
+          backendPublishKnowledge: publishKnowledge,
+          backendSetTempImgPack: setTempImgPack,
+          backendDelTempImgPack: delTempImgPack,
+          backendGetTempImgTempLinks: getTempImgTempLinks,
         }}
       >
         {children}

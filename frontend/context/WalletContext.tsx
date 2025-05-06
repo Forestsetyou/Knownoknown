@@ -10,6 +10,7 @@ interface WalletContextType {
     getWalletBalance: () => Promise<number>;
     validateWalletPrivateKey: (keyValue: string) => Promise<boolean>;
     setWalletKey: (keyValue: string) => Promise<boolean>;
+    getWalletKey: () => Promise<string>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -160,6 +161,10 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           throw error;
         }
     }
+
+    const getWalletKey = async () => {
+        return localWalletService!.getWalletKey();
+    }
   
     return (
       <WalletContext.Provider 
@@ -170,6 +175,7 @@ const WalletProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           getWalletBalance, 
           validateWalletPrivateKey: validatePrivateKey, 
           setWalletKey: setKey, 
+          getWalletKey,
         }}
       >
         {children}

@@ -5,6 +5,8 @@ import MarkdownEditor from 'react-markdown-editor-lite';
 import 'react-markdown-editor-lite/lib/index.css';
 import ReactMarkdown from 'react-markdown';
 import { useIpfs, IpfsServerStatus } from '@/context/IpfsContext';
+import { useBackend } from '@/context/BackendContext';
+import { useWallet } from '@/context/WalletContext';
 import { processImageToJpegUint8 } from '@/interface/utils';
 import { Image_Link_Format_Regex } from '@/interface/knownoknownDag/knowledgeEntryDagInterface';
 import { checkImageWithTimeout, uint8ArrayToDataURL } from '@/interface/utils';
@@ -17,7 +19,7 @@ export default function PublishChapters() {
   const [globalLoading, setGlobalLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [isModified, setIsModified] = useState(false);
-  const [tempImageUrls, setTempImageUrls] = useState<string[]>([]);
+  const [tempImagePackCID, setTempImagePackCID] = useState<string>('');
   const [previewContent, setPreviewContent] = useState<string>('');
   
   // 预览相关状态
@@ -48,9 +50,18 @@ export default function PublishChapters() {
     ipfsCheckKnowledgeDataPacked,
     ipfsPackKnowledgeData,
     ipfsCheckFingerprintData,
-    ipfsGenerateFingerprintData
+    ipfsGenerateFingerprintData,
+    ipfsGetTempImgPackCarBytes,
   } = useIpfs();
   
+  const {
+    backendSetTempImgPack,
+    backendDelTempImgPack,
+    backendGetTempImgTempLinks,
+  } = useBackend();
+
+  const { walletStatus } = useWallet();
+
   // 在状态管理部分添加预览加载状态
   const [previewLoading, setPreviewLoading] = useState(false);
   
@@ -134,11 +145,11 @@ export default function PublishChapters() {
   }, []);
   
   // 清理临时图片URL
-  useEffect(() => {
-    return () => {
-      tempImageUrls.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, [tempImageUrls]);
+  // useEffect(() => {
+  //   return () => {
+  //     tempImagePackCID.forEach(url => URL.revokeObjectURL(url));
+  //   };
+  // }, [tempImagePackCID]);
   
   // 添加新章节
   const handleAddChapter = async () => {
@@ -330,18 +341,22 @@ export default function PublishChapters() {
   
   // 切换预览
   const togglePreview = async () => {
+    if (!currentChapter) {
+      showToastNotification('当前章节为空', 'danger');
+      return;
+    }
+    if (isModified) {
+      showToastNotification('当前章节有未保存的修改，请先保存', 'danger');
+      return;
+    }
     setPreviewLoading(true);
     setShowPreview(!showPreview);
     if (!showPreview) {
-      setShowPreview(!showPreview);
       await getPreviewContent();
       setPreviewLoading(false);
     } else {
-      if (tempImageUrls.length > 0) {
-        for (const url of tempImageUrls) {
-          URL.revokeObjectURL(url);
-        }
-        setTempImageUrls([]);
+      if (tempImagePackCID) {
+        await backendDelTempImgPack(tempImagePackCID);
       }
       setPreviewContent('');
       setPreviewLoading(false);
@@ -349,28 +364,26 @@ export default function PublishChapters() {
   };
 
   const getPreviewContent = async () => { // 生成解析自定义的图片外链并生成临时图片链接
-    if (!currentChapter) {
-      showToastNotification('当前章节为空', 'danger');
-      return;
-    }
-    const image_link_cids = currentChapter.images;
     let preview_content = currentChapter.ipfs_markdown_data;
-    for (const image_link in image_link_cids) {
-      console.log('image_link:', image_link);
-      console.log('image_link_cids:', image_link_cids[image_link]);
-      const image_data = await ipfsGetTempImage(image_link_cids[image_link].toString());
-      if (!image_data) {
-        showToastNotification('图片获取失败', 'danger');
-        throw new Error('图片获取失败');
+
+    if (currentChapter.images.length === 0) {
+      setPreviewContent(preview_content);
+      return;
+    } else {
+      const walletAddress = walletStatus.address;
+      const tempImgPackCarBytes = await ipfsGetTempImgPackCarBytes(currentChapterIndex, walletAddress);
+      const {success, cid} = await backendSetTempImgPack(tempImgPackCarBytes);
+      if (!success) {
+        showToastNotification('临时图片打包失败', 'danger');
+        return;
       }
-      const tmp_image_url = URL.createObjectURL(new Blob([image_data]));
-      setTempImageUrls(prev => [...prev, tmp_image_url]);
-      console.log('tmp_image_url:', tmp_image_url);
-      console.log('checkImageWithTimeout:', await checkImageWithTimeout(tmp_image_url));
-      const tmp_image_link = `<img src="${tmp_image_url}" alt="" />`;
-      preview_content = preview_content.replace(image_link, tmp_image_link);
+      setTempImagePackCID(cid);
+      const tempImgTempLinks = await backendGetTempImgTempLinks(currentChapter.images);
+      for (const image_link in tempImgTempLinks) {
+        preview_content = preview_content.replace(image_link, tempImgTempLinks[image_link]);
+      }
+      setPreviewContent(preview_content);
     }
-    setPreviewContent(preview_content);
   };
   
   // 打包知识函数
@@ -706,7 +719,12 @@ export default function PublishChapters() {
             </div>
           ) : (
             <div className="markdown-preview p-3">
-              <ReactMarkdown>{previewContent || currentChapter?.ipfs_markdown_data || ''}</ReactMarkdown>
+              <ReactMarkdown
+              components={{
+                img: ({ src, alt, ...props }) => (
+                  <img src={src} alt={alt} {...props} />
+                ),
+              }}>{previewContent || currentChapter?.ipfs_markdown_data || ''}</ReactMarkdown>
             </div>
           )}
         </Modal.Body>

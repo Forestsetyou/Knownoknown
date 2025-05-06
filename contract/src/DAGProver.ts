@@ -1,4 +1,4 @@
-import { Field, Struct, Bool, Poseidon, MerkleWitness, MerkleTree, assert } from 'o1js';
+import { Field, Struct, Bool, Poseidon, MerkleWitness, MerkleTree, assert, Provable } from 'o1js';
 
 import { CID } from 'multiformats/cid'
 
@@ -125,6 +125,20 @@ class DAGProver extends Struct({
         }
         const proverMerkleRoot = proverMerkleTree.getRoot();
         return proverMerkleRoot;
+    }
+
+    static calculateNewMerkleRoot(dagCidArray: DAGCid[], dagIndex: number, dagAfter: DAGCid): Field {
+        const dagNum = dagCidArray.length;
+        const proverMerkleTree = new MerkleTree(DagMerkleDepth);
+        for (let i = 0; i < dagNum; i++) {
+            proverMerkleTree.setLeaf(BigInt(i), dagCidArray[i].toHash());
+        }
+        for (let i = dagNum; i < DagMerkleDepth; i++) {
+            proverMerkleTree.setLeaf(BigInt(i), DAGCid.empty().toHash());
+        }
+        const proverMerkleWitness = new DAGMerkleWitness(proverMerkleTree.getWitness(BigInt(dagIndex)));
+        const newMerkleRoot = proverMerkleWitness.calculateRoot(dagAfter.toHash());
+        return newMerkleRoot;
     }
 
     static structProver(dagCidArray: DAGCid[], dagIndex: number, dagAfter: DAGCid) {

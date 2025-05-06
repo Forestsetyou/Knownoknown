@@ -29,6 +29,15 @@ interface IpfsContextType {
     ipfsResetKnownoknownDag: () => Promise<void>;
     ipfsGenerateCheckReport: () => Promise<void>;
     ipfsCheckCheckReport: () => Promise<boolean>;
+    ipfsGetCheckReport: () => Promise<any>;
+    ipfsExportKnowledgeCheckPackManager: () => Promise<{ carName: string, carBytes: Uint8Array }>;
+    ipfsImportKnowledgeCheckPackManager: (carBytes: Uint8Array) => Promise<void>;
+    ipfsCheckKnowledgeBuilded: () => Promise<boolean>;
+    ipfsBuildKnowledge: (keys: any, encryptedKeys: any, publicKey: string) => Promise<void>;
+    ipfsTestFucntion: () => Promise<any>;
+    ipfsGetKnowledgePublishCID: () => Promise<string>;
+    ipfsGetKnowledgeCheckPackCarBytes: () => Promise<Uint8Array>;
+    ipfsGetTempImgPackCarBytes: (chapterIndex: number, walletAddress: string) => Promise<Uint8Array>;
 }
 
 const IpfsContext = createContext<IpfsContextType | undefined>(undefined);
@@ -191,6 +200,7 @@ const IpfsProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     }
 
     const generateCheckReport = async () => {
+      await resetKnownoknownDag();
       await localIpfsService!.generateCheckReport();
     }
     
@@ -198,6 +208,50 @@ const IpfsProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       const isCheckReport = await localIpfsService!.checkCheckReport();
       return isCheckReport;
     }
+
+    const getCheckReport = async () => {
+      const checkReport = await localIpfsService!.getCheckReport();
+      return checkReport;
+    }
+
+    const exportKnowledgeCheckPackManager = async () => {
+      const { carName, carBytes } = await localIpfsService!.exportKnowledgeCheckPackManager();
+      return { carName, carBytes };
+    }
+
+    const importKnowledgeCheckPackManager = async (carBytes: Uint8Array) => {
+      await localIpfsService!.importKnowledgeCheckPackManager(carBytes);
+    }
+
+    const buildKnowledge = async (keys: any, encryptedKeys: any, publicKey: string) => {
+      await localIpfsService!.buildKnowledge(keys, encryptedKeys, publicKey);
+    }
+
+    const checkKnowledgeBuilded = async () => {
+      const isPacked = await localIpfsService!.checkKnowledgeBuilded();
+      return isPacked;
+    }
+
+    const ipfsTestFucntion = async () => {
+      const result = await localIpfsService!.ipfsTestFucntion();
+      return result;
+    }
+
+    const getKnowledgePublishCID = async () => {
+      const knowledgePublishCID = await localIpfsService!.getKnowledgePublishCID();
+      return knowledgePublishCID;
+    }
+
+    const getKnowledgeCheckPackCarBytes = async () => {
+      const knowledgeCheckPackCarBytes = await localIpfsService!.getKnowledgeCheckPackCarBytes();
+      return knowledgeCheckPackCarBytes;
+    }
+
+    const getTempImgPackCarBytes = async (chapterIndex: number, walletAddress: string) => {
+      const tempImgPackCarBytes = await localIpfsService!.getTempImgPackCarBytes(chapterIndex, walletAddress);
+      return tempImgPackCarBytes;
+    }
+
     // 如果系统尚未初始化，显示加载中
     if (!initialized) {
       return (
@@ -258,6 +312,15 @@ const IpfsProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           ipfsResetKnownoknownDag: resetKnownoknownDag,
           ipfsGenerateCheckReport: generateCheckReport,
           ipfsCheckCheckReport: checkCheckReport,
+          ipfsGetCheckReport: getCheckReport,
+          ipfsExportKnowledgeCheckPackManager: exportKnowledgeCheckPackManager,
+          ipfsImportKnowledgeCheckPackManager: importKnowledgeCheckPackManager,
+          ipfsCheckKnowledgeBuilded: checkKnowledgeBuilded,
+          ipfsBuildKnowledge: buildKnowledge,
+          ipfsTestFucntion: ipfsTestFucntion,
+          ipfsGetKnowledgePublishCID: getKnowledgePublishCID,
+          ipfsGetKnowledgeCheckPackCarBytes: getKnowledgeCheckPackCarBytes,
+          ipfsGetTempImgPackCarBytes: getTempImgPackCarBytes,
         }}
       >
         {children}

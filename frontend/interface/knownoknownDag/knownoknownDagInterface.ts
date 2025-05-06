@@ -14,7 +14,6 @@ interface Knowledge_List_Entry {
 interface Knownoknown_Metadata {	// 平台 metadata
 	knowledge_num: number,	// 已创作且记录的知识实体的数量
     free_num: number,	// 已免费的知识实体数量
-    report_num: number,	// 已生成查重检测报告的知识实体数量
     notices_num: number,	// 通知总数
     comment_num: number,	// 评论总数
     application_num: number,	// 请求事件总数
@@ -22,17 +21,18 @@ interface Knownoknown_Metadata {	// 平台 metadata
 
 type Notice_Record = {
     id: Notice_ID,	// 消息 ID
+    user: User_Publickey,	// 用户地址, 为空表示针对所有用户
     content: string, // 通知内容
     timestamp: number, // 通知时间
 }
 
-type User_Notice = {	// user_notice
-    user: User_Publickey,	// 用户地址
-	notice_list: Array<Notice_Record>
-}
+// type User_Notice = {	// user_notice
+//     user: User_Publickey,	// 用户地址
+// 	notice_list: Array<Notice_Record>
+// }
 
 interface Notice_Entry {	// notice_entry
-	user_notice_list: Record<User_Publickey, User_Notice>, // 按照用户罗列通知信息
+	user_notice_list: Record<User_Publickey, CID>, // 按照用户罗列通知信息, cid-> Array<Notice_Record>
     platform_notice_list: Array<Notice_Record> // 针对所有用户的消息通知
 }
 
@@ -161,4 +161,4 @@ interface Knownoknown_Entry {	// KnowNoKnownEntry
     },
 }
 
-export type { Knownoknown_Entry, Knowledge_List_Entry, Notice_Entry, Application_Entry, Comment_Entry, Star_Enrty, Knowledge_Comment_Index_Entry, Fingerprint_Index_Entry, Knowledge_Metadata_Index_Entry, Knowledge_Checkreport_Index_Entry, Knownoknown_Metadata };
+export type { Knownoknown_Entry, Knowledge_List_Entry, Notice_Entry, Application_Entry, Comment_Entry, Star_Enrty, Knowledge_Comment_Index_Entry, Fingerprint_Index_Entry, Knowledge_Metadata_Index_Entry, Knowledge_Checkreport_Index_Entry, Knownoknown_Metadata, Notice_Record };

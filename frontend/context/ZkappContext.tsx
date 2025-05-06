@@ -9,6 +9,11 @@ interface ZkappContextType {
     zkappStatus: ZkappStatus;
     getZkappFields: () => Promise<ZkappFields>;
     compileZkapp: () => Promise<void>;
+    zkappEncryptKey: (key: Uint8Array, nonce: Uint8Array, publicKeyStr: string) => Promise<any>;
+    zkappDecryptKey: (serializedEncryptedKey: any, serializedEncryptedNonce: any, privateKeyStr: string) => Promise<any>;
+    zkappPublishToContract: (type: string, publishCid: string, privateKeyStr: string) => Promise<any>;
+    zkappWaitPublishToContract: () => Promise<any>;
+    zkappWaitMerkleRoot: (type: 'knowledge' | 'application', oldMerkleRoot: string, newMerkleRoot: string) => Promise<any>;
 }
 
 const ZkappContext = createContext<ZkappContextType | undefined>(undefined);
@@ -86,6 +91,26 @@ const ZkappProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         compileStatus: true
       }));
     }
+
+    const encryptKey = async (key: Uint8Array, nonce: Uint8Array, publicKeyStr: string) => {
+      return localZkappService!.encryptKey(key, nonce, publicKeyStr);
+    }
+
+    const decryptKey = async (serializedEncryptedKey: any, serializedEncryptedNonce: any, privateKeyStr: string) => {
+      return localZkappService!.decryptKey(serializedEncryptedKey, serializedEncryptedNonce, privateKeyStr);
+    }
+
+    const publishToContract = async (type: string, publishCid: string, privateKeyStr: string) => {
+      return localZkappService!.publishToContract(type, publishCid, privateKeyStr);
+    }
+
+    const waitPublishToContract = async () => {
+      return localZkappService!.waitPublishToContract();
+    }
+
+    const waitMerkleRoot = async (type: 'knowledge' | 'application', oldMerkleRoot: string, newMerkleRoot: string) => {
+      return localZkappService!.waitMerkleRoot(type, oldMerkleRoot, newMerkleRoot);
+    }
     
     // 如果系统尚未初始化，显示加载中
     if (!initialized) {
@@ -126,6 +151,11 @@ const ZkappProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           zkappStatus: zkappStatus, 
           getZkappFields: getZkappFields, 
           compileZkapp: compileZkapp, 
+          zkappEncryptKey: encryptKey,
+          zkappDecryptKey: decryptKey,
+          zkappPublishToContract: publishToContract,
+          zkappWaitPublishToContract: waitPublishToContract,
+          zkappWaitMerkleRoot: waitMerkleRoot
         }}
       >
         {children}

@@ -138,7 +138,7 @@ class LocalWalletService {
   }
 
   getWalletKey() {
-    return this.key;
+    return this.key as string;
   }
 }
 

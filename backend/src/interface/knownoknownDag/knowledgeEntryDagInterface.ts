@@ -18,8 +18,15 @@ type Winnowing_Fingerprint = number[];
 type Phash_Fingerprint = string;
 
 // 加密密钥
-type Decryption_Key = Uint8Array;   // 对称加密密钥
-type Mix_Decryption_Key = Uint8Array;   // 混合加密密钥
+type Decryption_Key = {
+    key: Uint8Array,
+    nonce: Uint8Array
+};   // 对称加密密钥
+type Mix_Decryption_Key = {
+    publicKey: Array<string>,
+    cipherText: Array<Array<string>>,
+    messageLength: number,
+}   // 混合加密密钥
 
 type Md_Data = string;
 type Knowledge_ID = CID_Str;
@@ -116,46 +123,27 @@ interface Knowledge_Data {	// 具体某个知识的图谱数据
 type Pure_Text_Similarity_Record = {
     origin_knowledge_id: Knowledge_ID, // 本知识的id
     compared_knowledge_id: Knowledge_ID, // 被比较知识的id
+    compared_knowledge_title: string, // 被比较知识的标题
     text_cid: CID_Str, // 本知识的纯文本cid
     compared_text_cid: CID_Str, // 被比较知识的纯文本cid
     similarity: Simhash_Similarity,	// 内部指纹数组位序表示被比较知识的public_order
     score: number, // 相似度得分
 }
 
-// winnowing: {
-//     <KnowledgeID>: {	// 被比较知识的id
-//         <CID_Str>: {	// 本知识代码块的cid
-//             // 被比较代码块的cid_str: res
-//             <CID_Str>: <ComparedRes>,	
-//         },
-//     },
-// }
 type Code_Section_Similarity_Record = {
     origin_knowledge_id: Knowledge_ID, // 本知识的id
     compared_knowledge_id: Knowledge_ID, // 被比较知识的id
+    compared_knowledge_title: string, // 被比较知识的标题
     code_section_cid: CID_Str, // 本知识的代码块cid
     compared_code_section_cid: CID_Str, // 被比较知识的代码块cid
     similarity: Winnowing_Similarity, // 比较结果
     score: number, // 相似度得分
 }
 
-
-// image_similarity: {	// 图片比较
-//     phash: {
-//         <KnowledgeID>: {	// 被比较知识的id
-//             <CID_Str>: {	// 本知识图片的cid
-//                 // 被比较图片的cid_str: res
-//                 <CID_Str>: <ComparedRes>,
-//                 ...
-//             },
-//             ...
-//         },
-//         ...
-//     }
-// },
 type Image_Similarity_Record = {
     origin_knowledge_id: Knowledge_ID, // 本知识的id
     compared_knowledge_id: Knowledge_ID, // 被比较知识的id
+    compared_knowledge_title: string, // 被比较知识的标题
     image_cid: CID_Str, // 本知识的图片cid
     compared_image_cid: CID_Str, // 被比较知识的图片cid
     similarity: Phash_Similarity, // 比较结果
@@ -170,7 +158,7 @@ interface Checkreport {	// check_report
     image_similarity: Array<Image_Similarity_Record>,
 	image_score: number,	// 图片检测分数
     fingerprint_data_cid_str: string, // 报告对应的指纹数据cid_str
-}	// 目前的报告格式仅用于测试，后续仍要修改
+}	
 
 
 // code_section_fingerprint: {	// code_section_fingerprint, 代码块的指纹数据, minhash
@@ -187,20 +175,32 @@ type Code_Section_Fingerprint_Record = {
     type: Code_Type, // <CodeType>, 代码类型
     fingerprint: Winnowing_Fingerprint // <winnowing_fingerprint>, 指纹数据
 }
-type Code_Section_Fingerprint = Record<
-    CID_Str, // <CID_Str>, 代码块cid_Str
-    Code_Section_Fingerprint_Record
->;
+type Code_Section_Fingerprint = {
+    fingerprint: Record<
+        CID_Str, // <CID_Str>, 代码块cid_Str
+        Code_Section_Fingerprint_Record
+    >,
+    self_description: string,   // 默认为 "Code_Section_Fingerprint"
+    knowledge_id: Knowledge_ID, // 知识id
+};
 
-type Image_Fingerprint = Record<
-    CID_Str, // 图片cid
-    Phash_Fingerprint // 指纹数据
->;
+type Image_Fingerprint = {
+    fingerprint: Record<
+        CID_Str, // 图片cid
+        Phash_Fingerprint // 指纹数据
+    >,
+    self_description: string,   // 默认为 "Image_Fingerprint"
+    knowledge_id: Knowledge_ID, // 知识id
+};
 
-type Pure_Text_Fingerprint = Record<
-    CID_Str, // 纯文本cid, cid -> ipfs_markdown_data
-    Simhash_Fingerprint
->
+type Pure_Text_Fingerprint = {
+    fingerprint: Record<
+        CID_Str, // 纯文本cid, cid -> ipfs_markdown_data
+        Simhash_Fingerprint
+    >,
+    self_description: string,   // 默认为 "Pure_Text_Fingerprint"
+    knowledge_id: Knowledge_ID, // 知识id
+};
 
 interface Fingerprint_Data {	// fingerprint_data
     code_section_fingerprint: CID,	// 代码块指纹数据cid, cid-> Code_Section_Fingerprint
@@ -240,10 +240,16 @@ interface Knowledge_Entry {
 }
 
 interface Knowledge_Check_Pack {    // 专用于创建知识和管理员查验知识，将待发布知识与明文内容打包在一起
-    Knowledge_Entry: Knowledge_Entry,
-    Knowledge_Data: Knowledge_Data,
+    knowledge_entry: CID,
+    knowledge_data: CID,
 }
 
-export type { Knowledge_Entry, Knowledge_ID, Md_Data, Pure_Text_Fingerprint, Code_Section_Fingerprint, Image_Fingerprint, Knowledge_Metadata, Checkreport, Public_Order, Knowledge_Check_Pack, Knowledge_Chapter_Data, Code_Section_Data, Image_Data, Tmp_Image_Pack, Fingerprint_Data };
+interface Temp_Image_Pack { // 临时图片包，用于渲染
+    id: number,
+    user: User_Publickey,
+    images: Record<string, CID>
+}
+
+export type { Knowledge_Entry, Knowledge_ID, Md_Data, Pure_Text_Fingerprint, Code_Section_Fingerprint, Image_Fingerprint, Knowledge_Metadata, Checkreport, Public_Order, Knowledge_Check_Pack, Knowledge_Chapter_Data, Code_Section_Data, Image_Data, Tmp_Image_Pack, Fingerprint_Data, Temp_Image_Pack};
 
 export { Custom_Link_Format, Code_Type, IMAGE_DATA_TYPE, Image_Link_Format_Regex, Code_Link_Format_Regex, Code_Section_Regex };

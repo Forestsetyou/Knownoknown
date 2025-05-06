@@ -4,6 +4,30 @@ import { ServiceMap } from '@libp2p/interface';
 import { CID } from 'multiformats/cid'
 
 const PIN_TIMEOUT = 20000;  // 20秒
+
+async function pinAdd(helia: HeliaLibp2p<Libp2p<ServiceMap>> | Helia, cid: CID, option: AddOptions = {}) {
+    const pinOption = { // 添加定时
+        ...option,
+        signal: AbortSignal.timeout(PIN_TIMEOUT),
+    }
+    console.log("pinAdd:", cid.toString());
+    for await (const pinnedCID of helia.pins.add(cid, pinOption)) {
+        console.log("pinnedCID:", pinnedCID);
+    }
+}
+
+async function pinRm(helia: HeliaLibp2p<Libp2p<ServiceMap>> | Helia, cid: CID, option: RmOptions = {}) {
+    const rmOption = { // 添加定时
+        ...option,
+        signal: AbortSignal.timeout(PIN_TIMEOUT),
+    }
+    console.log("pinRm:", cid.toString());
+    for await (const rmPinnedCID of helia.pins.rm(cid, rmOption)) {
+        console.log("rmPinnedCID:", rmPinnedCID);
+    }
+    helia.gc();
+}
+
 class KnownoknownDagManager {
     private helia: HeliaLibp2p<Libp2p<ServiceMap>> | Helia;
 
@@ -24,24 +48,11 @@ class KnownoknownDagManager {
     }
 
     async pinAdd(cid: CID, option: AddOptions = {}) {
-        const pinOption = { // 添加定时
-            ...option,
-            signal: AbortSignal.timeout(PIN_TIMEOUT),
-        }
-        for await (const pinnedCID of this.helia.pins.add(cid, pinOption)) {
-            console.log("pinnedCID:", pinnedCID);
-        }
+        await pinAdd(this.helia, cid, option);
     }
 
     async pinRm(cid: CID, option: RmOptions = {}) {
-        const rmOption = { // 添加定时
-            ...option,
-            signal: AbortSignal.timeout(PIN_TIMEOUT),
-        }
-        for await (const rmPinnedCID of this.helia.pins.rm(cid, rmOption)) {
-            console.log("rmPinnedCID:", rmPinnedCID);
-        }
-        this.helia.gc();
+        await pinRm(this.helia, cid, option);
     }
 
     // 已有区块数据，从PinList中初始化
@@ -97,6 +108,10 @@ class KnownoknownDagManager {
                 case "statusFlag":
                     console.log("statusFlagCID:", pinCID)
                     break;
+                case "temp_img_pack:infinite":
+                    console.log("rm temp_img_pack_entry_cid:", pinCID)
+                    await this.pinRm(pinCID);
+                    break;
                 default:
                     console.log(pin)
                     throw new Error(`Unknown metadata name: ${metadata.name}`);
@@ -107,9 +122,10 @@ class KnownoknownDagManager {
 
     // 以下是管理 Knowledge_DB 的方法
     async setKnownoknownEntry(newEntryCID: CID) {
-        // if (this.knownoknown_entry_cid === newEntryCID) {
-        //     return;
-        // }
+        if (this.knownoknown_entry_cid?.toString() === newEntryCID.toString()) {
+            console.log("knownoknown_entry_cid is already set", this.knownoknown_entry_cid.toString())
+            return;
+        }
         await this.pinAdd(newEntryCID, {
             metadata: {
                 name: "knownoknown_entry:1",
@@ -125,6 +141,10 @@ class KnownoknownDagManager {
     }
 
     async setMetadata(newEntryCID: CID) {
+        if (this.metadata_cid?.toString() === newEntryCID.toString()) {
+            console.log("metadata_cid is already set", this.metadata_cid.toString())
+            return;
+        }
         await this.pinAdd(newEntryCID, {
             metadata: {
                 name: "metadata:infinite",
@@ -139,6 +159,10 @@ class KnownoknownDagManager {
     }
 
     async setKnowledgeListEntry(newEntryCID: CID) {
+        if (this.knowledge_list_entry_cid?.toString() === newEntryCID.toString()) {
+            console.log("knowledge_list_entry_cid is already set", this.knowledge_list_entry_cid.toString())
+            return;
+        }
         await this.pinAdd(newEntryCID, {
             metadata: {
                 name: "knowledge_list_entry:infinite",
@@ -153,6 +177,10 @@ class KnownoknownDagManager {
     }
 
     async setNoticeEntry(newEntryCID: CID) {
+        if (this.notice_entry_cid?.toString() === newEntryCID.toString()) {
+            console.log("notice_entry_cid is already set", this.notice_entry_cid.toString())
+            return;
+        }
         await this.pinAdd(newEntryCID, {
             metadata: {
                 name: "notice_entry:infinite",
@@ -167,6 +195,10 @@ class KnownoknownDagManager {
     }
 
     async setApplicationEntry(newEntryCID: CID) {
+        if (this.application_entry_cid?.toString() === newEntryCID.toString()) {
+            console.log("application_entry_cid is already set", this.application_entry_cid.toString())
+            return;
+        }
         await this.pinAdd(newEntryCID, {
             metadata: {
                 name: "application_entry:infinite",
@@ -181,6 +213,10 @@ class KnownoknownDagManager {
     }
 
     async setCommentEntry(newEntryCID: CID) {
+        if (this.comment_entry_cid?.toString() === newEntryCID.toString()) {
+            console.log("comment_entry_cid is already set", this.comment_entry_cid.toString())
+            return;
+        }
         await this.pinAdd(newEntryCID, {
             metadata: {
                 name: "comment_entry:infinite",
@@ -195,6 +231,10 @@ class KnownoknownDagManager {
     }
 
     async setStarEntry(newEntryCID: CID) {
+        if (this.star_entry_cid?.toString() === newEntryCID.toString()) {
+            console.log("star_entry_cid is already set", this.star_entry_cid.toString())
+            return;
+        }
         await this.pinAdd(newEntryCID, {
             metadata: {
                 name: "star_entry:infinite",
@@ -209,6 +249,10 @@ class KnownoknownDagManager {
     }
 
     async setKnowledgeCommentIndexEntry(newEntryCID: CID) {
+        if (this.knowledge_comment_index_entry_cid?.toString() === newEntryCID.toString()) {
+            console.log("knowledge_comment_index_entry_cid is already set", this.knowledge_comment_index_entry_cid.toString())
+            return;
+        }
         await this.pinAdd(newEntryCID, {
             metadata: {
                 name: "knowledge_comment_index_entry:infinite",
@@ -223,6 +267,10 @@ class KnownoknownDagManager {
     }
 
     async setFingerprintIndexEntry(newEntryCID: CID) {
+        if (this.fingerprint_index_entry_cid?.toString() === newEntryCID.toString()) {
+            console.log("fingerprint_index_entry_cid is already set", this.fingerprint_index_entry_cid.toString())
+            return;
+        }
         await this.pinAdd(newEntryCID, {
             metadata: {
                 name: "fingerprint_index_entry:infinite",
@@ -237,6 +285,10 @@ class KnownoknownDagManager {
     }
 
     async setKnowledgeMetadataIndexEntry(newEntryCID: CID) {
+        if (this.knowledge_metadata_index_entry_cid?.toString() === newEntryCID.toString()) {
+            console.log("knowledge_metadata_index_entry_cid is already set", this.knowledge_metadata_index_entry_cid.toString())
+            return;
+        }
         await this.pinAdd(newEntryCID, {
             metadata: {
                 name: "knowledge_metadata_index_entry:infinite",
@@ -251,6 +303,10 @@ class KnownoknownDagManager {
     }
 
     async setKnowledgeCheckreportIndexEntry(newEntryCID: CID) {
+        if (this.knowledge_checkreport_index_entry_cid?.toString() === newEntryCID.toString()) {
+            console.log("knowledge_checkreport_index_entry_cid is already set", this.knowledge_checkreport_index_entry_cid.toString())
+            return;
+        }
         await this.pinAdd(newEntryCID, {
             metadata: {
                 name: "knowledge_checkreport_index_entry:infinite",
@@ -340,24 +396,11 @@ class KnownoknownFingerprintGenerator {
     }
 
     async pinAdd(cid: CID, option: AddOptions = {}) {
-        const pinOption = { // 添加定时
-            ...option,
-            signal: AbortSignal.timeout(PIN_TIMEOUT),
-        }
-        for await (const pinnedCID of this.helia.pins.add(cid, pinOption)) {
-            console.log("pinnedCID:", pinnedCID);
-        }
+        await pinAdd(this.helia, cid, option);
     }
 
     async pinRm(cid: CID, option: RmOptions = {}) {
-        const rmOption = { // 添加定时
-            ...option,
-            signal: AbortSignal.timeout(PIN_TIMEOUT),
-        }
-        for await (const rmPinnedCID of this.helia.pins.rm(cid, rmOption)) {
-            console.log("rmPinnedCID:", rmPinnedCID);
-        }
-        this.helia.gc();
+        await pinRm(this.helia, cid, option);
     }
 
     async initialize() {
@@ -386,4 +429,39 @@ class KnownoknownFingerprintGenerator {
     
 }
 
-export { KnownoknownDagManager, KnownoknownFingerprintGenerator };
+class TempImgRManager {
+    private helia: HeliaLibp2p<Libp2p<ServiceMap>> | Helia;
+    private tempImgPackCids: Array<CID>;
+
+    constructor(helia: HeliaLibp2p<Libp2p<ServiceMap>> | Helia) {
+        this.helia = helia;
+        this.tempImgPackCids = [];
+    }
+
+    async pinAdd(cid: CID, option: AddOptions = {}) {
+        await pinAdd(this.helia, cid, option);
+    }
+
+    async pinRm(cid: CID, option: RmOptions = {}) {
+        await pinRm(this.helia, cid, option);
+    }
+
+    async addTempImgPack(newEntryCID: CID) {
+        await this.pinAdd(newEntryCID, {
+            metadata: {
+                name: "temp_img_pack:infinite",
+                description: "update temp_img_pack with infinite depth",
+                timestamp: Date.now(),
+            },
+        });
+        this.tempImgPackCids.push(newEntryCID);
+    }
+
+    async removeTempImgPack(newEntryCID: CID) {
+        await this.pinRm(newEntryCID);
+        this.tempImgPackCids = this.tempImgPackCids.filter(cid => cid.toString() !== newEntryCID.toString());
+    }
+}
+
+
+export { KnownoknownDagManager, KnownoknownFingerprintGenerator, TempImgRManager };

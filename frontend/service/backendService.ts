@@ -16,9 +16,14 @@ enum backendUrl {
   BASE_URL="http://localhost:12891",
   ROUTER_STATUS="/admin/status",
   ROUTER_EXTRACT_FINGERPRINT="/admin/extract-fingerprint",
+  ROUTER_PUBLISH_KNOWLEDGE="/admin/publish-knowledge",
+  ROUTER_SET_TEMP_IMG_PACK="/admin/tempImg/set",
+  ROUTER_DEL_TEMP_IMG_PACK="/admin/tempImg/del/:cid",
+  ROUTER_GET_TEMP_IMG_URLS="/admin/tempImg/get/:cid"
 }
 
 const TIMEOUT = 10000;  // 10 seconds
+const LONG_TIMEOUT = 60000;  // 60 seconds
 class LocalBackendService {
     status: BackendServerStatus;
     knownoknownEntryCID: string;
@@ -97,6 +102,57 @@ class LocalBackendService {
     if (!rep.ok) throw new Error(await rep.text());
     const fingerprintDataCarBytes = new Uint8Array(await rep.arrayBuffer());
     return fingerprintDataCarBytes;
+  }
+
+  async publishKnowledge(knowledgeCheckPackCarBytes: Uint8Array) {
+    const submitPublishKnowledgeCheckPack_url = backendUrl.BASE_URL+backendUrl.ROUTER_PUBLISH_KNOWLEDGE;
+    const rep = await fetch(submitPublishKnowledgeCheckPack_url, {
+      method: "POST",
+      body: knowledgeCheckPackCarBytes,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+      },
+      signal: AbortSignal.timeout(LONG_TIMEOUT),
+    })
+    if (!rep.ok) throw new Error(await rep.text());
+    const repBody = await rep.json();
+    return {success: repBody.success, newMerkleRoot: repBody.newMerkleRoot, oldMerkleRoot: repBody.oldMerkleRoot};
+  }
+
+  async setTempImgPack(tempImgPackCarBytes: Uint8Array) {
+    const setTempImgPack_url = backendUrl.BASE_URL+backendUrl.ROUTER_SET_TEMP_IMG_PACK;
+    const rep = await fetch(setTempImgPack_url, {
+      method: "POST",
+      body: tempImgPackCarBytes,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+      },
+      signal: AbortSignal.timeout(TIMEOUT),
+    })
+    if (!rep.ok) throw new Error(await rep.text());
+    const repBody = await rep.json();
+    return {success: repBody.success, cid: repBody.cid};
+  }
+
+  async delTempImgPack(tempImgPackCid: string) {
+    const delTempImgPack_url = backendUrl.BASE_URL+backendUrl.ROUTER_DEL_TEMP_IMG_PACK.replace(":cid", tempImgPackCid);
+    const rep = await fetch(delTempImgPack_url, {
+      method: "GET",
+    })
+    if (!rep.ok) throw new Error(await rep.text());
+    const repBody = await rep.json();
+    return {success: repBody.success};
+  }
+
+  async getTempImgTempLinks(images: any) {
+    const tempImgTempLinks: any = {};
+    for (const image_link in images) {
+      const cidStr = images[image_link].toString();
+      const image_url = backendUrl.BASE_URL+backendUrl.ROUTER_GET_TEMP_IMG_URLS.replace(":cid", cidStr);
+      const temp_link = `![](${image_url})`;
+      tempImgTempLinks[image_link] = temp_link;
+    }
+    return tempImgTempLinks;
   }
 }
 

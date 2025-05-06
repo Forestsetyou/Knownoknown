@@ -191,7 +191,34 @@ async function uint8ArrayToDataURL(
   });
 }
 
+async function saveWithFileSystemAPI(data: Uint8Array, suggestedName: string, window: any) {
+  try {
+    if (!window || !window.showSaveFilePicker) {
+      throw new Error('showSaveFilePicker is not supported in this browser');
+    }
+    const handle = await window.showSaveFilePicker({
+      suggestedName,
+      types: [{
+        description: '导出知识工作流CAR文件',
+        accept: { 'application/octet-stream': ['.car'] },
+      }],
+    });
+    
+    const writable = await handle.createWritable();
+    await writable.write(data);
+    await writable.close();
+    
+    console.log('文件保存成功！');
+  } catch (err) {
+    console.error('用户取消或发生错误:', err);
+  }
+  // 示例用法
+  // const uint8Array = new Uint8Array([72, 101, 108, 108, 111]);
+  // saveWithFileSystemAPI(uint8Array, 'example.bin');
+}
+
+
 // HTML中使用
 // <input type="file" accept="image/*" @change="handleFileUpload" />
 
-export { createMyHeliaHTTP, handleFileUpload, streamToUint8Array, checkImageWithTimeout, uint8ArrayToDataURL };
+export { createMyHeliaHTTP, handleFileUpload, streamToUint8Array, checkImageWithTimeout, uint8ArrayToDataURL, saveWithFileSystemAPI };
