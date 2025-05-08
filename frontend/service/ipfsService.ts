@@ -476,13 +476,16 @@ class IpfsService {
         const fingerprintIndexEntry = (await this.dagCborGet(knownoknownEntry.index_entry.fingerprint_index_entry)) as any;
         console.log('fingerprintIndexEntry', fingerprintIndexEntry);
         const knowledgeIdTitleMap = await this.getKnowledgeIdTitles();
+        console.log('knowledgeIdTitleMap', knowledgeIdTitleMap);
         
         // 文本检测
         for (const pureTextCidStr in pureTextFingerprint.fingerprint) {
             const pureTextFingerprintData = pureTextFingerprint.fingerprint[pureTextCidStr];
+            console.log('pureTextFingerprintData', pureTextFingerprintData);
             for (const comparedKnowledgeID in fingerprintIndexEntry.pure_text_fingerprint) {
                 const comparedPureTextFingerprintCidStr = fingerprintIndexEntry.pure_text_fingerprint[comparedKnowledgeID];
                 const comparedPureTextFingerprintCid = CID.parse(comparedPureTextFingerprintCidStr);
+                // console.log('comparedPureTextFingerprintCidStr', comparedPureTextFingerprintCidStr);
                 const comparedPureTextFingerprint = (await this.dagCbor.get(comparedPureTextFingerprintCid)) as any;
                 for (const comparedPureTextCidStr in comparedPureTextFingerprint.fingerprint) {
                     const comparedPureTextFingerprintData = comparedPureTextFingerprint.fingerprint[comparedPureTextCidStr];
@@ -504,6 +507,7 @@ class IpfsService {
                 }
             }
         }
+        // console.log('checkReport.pure_text_similarity', checkReport.pure_text_similarity);
 
         // 代码块检测
         console.log("codeSectionFingerprint", codeSectionFingerprint);
@@ -541,6 +545,7 @@ class IpfsService {
                 }
             }
         }
+        // console.log('checkReport.code_section_similarity', checkReport.code_section_similarity);
         
         // 图片检测
         for (const imageCidStr in imageFingerprint.fingerprint) {
@@ -569,8 +574,8 @@ class IpfsService {
                 }
             }
         }
-
-        console.log('checkReport', checkReport);
+        // console.log('checkReport.image_similarity', checkReport.image_similarity);
+        // console.log('checkReport', checkReport);
         const checkReportCID = await this.dagCbor.add(checkReport);
         await this.knowledgeCheckPackManager.setCheckReport(checkReportCID);
     }

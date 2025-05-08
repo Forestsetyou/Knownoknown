@@ -247,10 +247,10 @@ export class KnowledgeDBServer {
         // 生成发布数组
         const newDagArr = await this.generateDAGCidArray('knowledge');
         const newDagProver = DAGProver.structProver(newDagArr, metadata.knowledge_num, nowDAGCid);
-        console.log("newDagArr:", newDagArr);
-        console.log("index:", metadata.knowledge_num);
-        console.log("structCid:", knowledgeEntryCID.toString());
-        console.log("structCidHash:", nowDAGCid.toHash().toString());
+        // console.log("newDagArr:", newDagArr);
+        // console.log("index:", metadata.knowledge_num);
+        // console.log("structCid:", knowledgeEntryCID.toString());
+        // console.log("structCidHash:", nowDAGCid.toHash().toString());
         const newMerkleRoot = DAGProver.calculateNewMerkleRoot(newDagArr, metadata.knowledge_num, nowDAGCid);
 
         // 更新knowledgeListEntry
@@ -351,7 +351,7 @@ export class KnowledgeDBServer {
                 const imageFingerprintData = await PHash(imageData, `${imageLink}.${IMAGE_DATA_TYPE.split("/")[1]}`);
                 imageFingerprint.fingerprint[chapterData.images[imageLink].toString()] = imageFingerprintData;
             }
-            console.log("chapterData.code_sections:", chapterData.code_sections);
+            // console.log("chapterData.code_sections:", chapterData.code_sections);
             for (const codeLink in chapterData.code_sections) {
                 const codeReader = this.fs.cat(chapterData.code_sections[codeLink])
                 const code = new TextDecoder().decode(await streamToBuffer(codeReader));
@@ -374,12 +374,16 @@ export class KnowledgeDBServer {
             self_description: "Pure_Text_Fingerprint",
             knowledge_id: knowledgeDataCid.toString()
         }
+        console.log('pureTextFingerprint', pureTextFingerprint);
         const pureTextFingerprintCid = await this.dagCbor.add(pureTextFingerprint);
+        console.log('pureTextFingerprintCid', pureTextFingerprintCid);
         await knownoknownFingerprintGenerator.setPureTextFingerprint(pureTextFingerprintCid);
+
+
         const imageFingerprintCid = await this.dagCbor.add(imageFingerprint);
         await knownoknownFingerprintGenerator.setImageFingerprint(imageFingerprintCid);
         const codeFingerprintCid = await this.dagCbor.add(codeFingerprint);
-        console.log("codeFingerprint:", codeFingerprint);
+        // console.log("codeFingerprint:", codeFingerprint);
         await knownoknownFingerprintGenerator.setCodeSectionFingerprint(codeFingerprintCid);
         const fingerprintData = {
             code_section_fingerprint: codeFingerprintCid,

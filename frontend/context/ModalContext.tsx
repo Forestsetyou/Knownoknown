@@ -18,6 +18,8 @@ interface ModalState {
   onCancel?: () => void;
   closable: boolean;
   customContent?: React.ReactNode;
+  size?: 'sm' | 'lg' | 'xl';
+  onHide?: () => void;
 }
 
 // 模态窗口上下文接口
@@ -40,7 +42,9 @@ const defaultModalState: ModalState = {
   type: 'loading',
   title: '',
   message: '',
-  closable: true
+  closable: true,
+  size: undefined,
+  onHide: () => {}
 };
 
 // 模态窗口提供者组件
@@ -60,7 +64,9 @@ export const ModalProvider: React.FC<{children: ReactNode}> = ({ children }) => 
   const hideModal = () => {
     setModalState(prev => ({
       ...prev,
-      isOpen: false
+      isOpen: false,
+      onHide: undefined,
+      size: undefined,
     }));
   };
 
@@ -208,10 +214,11 @@ export const ModalProvider: React.FC<{children: ReactNode}> = ({ children }) => 
       
       <Modal 
         show={modalState.isOpen} 
-        onHide={modalState.closable ? hideModal : undefined}
+        onHide={modalState.onHide || modalState.closable ? hideModal : undefined}
         centered
         backdrop={modalState.closable ? true : 'static'}
         keyboard={modalState.closable}
+        size={modalState.size}
       >
         {modalState.title && (
           <Modal.Header closeButton={modalState.closable}>

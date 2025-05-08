@@ -148,6 +148,13 @@ export class ExpressApp {
               }
             }
           );
+          this.app.get('/admin/ipfsTest/:cid', cors(adminServerCorsOptions), async (req, res) => {
+            const hasCid = await this.knowledgeDB.blockHas(CID.parse(req.params.cid));
+            res.json({
+              success: true,
+              hasCid: hasCid
+            });
+          });
           this.app.post('/admin/publish-knowledge', 
               cors(adminServerCorsOptions),
               // 禁用 bodyParser 以直接处理二进制流

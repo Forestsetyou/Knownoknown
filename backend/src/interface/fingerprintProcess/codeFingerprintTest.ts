@@ -104,6 +104,41 @@ if (FibonacciCalculator.validate(fibonacciParam)) {
     const optimizedResult = calculator.calculate(fibonacciParam);
 }
 `
+const js_code2 = `
+function sequenceSum(n) {
+    if (n < 2) return n;
+    return sequenceSum(n - 1) + sequenceSum(n - 2);
+}
+// 函数调用
+const inputNum = 10;
+const outputValue = sequenceSum(inputNum);
+// 类定义
+class SeriesComputer {
+    static UPPER_LIMIT = 1000; // 静态成员变量
+    constructor() {
+        this.cache = {};       // 实例成员变量
+        this.invokeTimes = 0;  // 方法调用计数器
+    }
+    // 实例方法（带缓存优化）
+    compute(n) {
+        this.invokeTimes++;
+        if (n in this.cache) return this.cache[n];
+        if (n < 2) return n;
+        const val = this.compute(n - 1) + this.compute(n - 2);
+        this.cache[n] = val;
+        return val;
+    }
+    // 静态方法
+    static checkValid(n) {
+        return Number.isInteger(n) && n > -1;
+    }
+}
+// 类实例化与调用
+const processor = new SeriesComputer();
+if (SeriesComputer.checkValid(inputNum)) {
+    const cachedResult = processor.compute(inputNum);
+}
+`
 const cpp_code = `
 #include <iostream>
 #include <unordered_map>
@@ -267,7 +302,13 @@ public class Main {
 // const [sim] = CodeSimilarity(fp1, fp2);
 // const score = CodeScore(sim);
 // console.log(score);
-// Winnowing(js_code, 'javascript');
+const fp1 = Winnowing(js_code, 'javascript');
+const fp2 = Winnowing(js_code2, 'javascript');
+const [sim] = CodeSimilarity(fp1, fp2);
+const score = CodeScore(sim);
+// console.log(`"js_code.js"指纹: ${fp1}`);
+// console.log(`"js_code2.js"指纹: ${fp2}`);
+console.log(`相似度: ${sim}, 得分: ${score}`);
 
 // Winnowing(cpp_code, 'cpp');
 

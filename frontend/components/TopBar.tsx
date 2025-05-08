@@ -118,7 +118,7 @@ const TopBar = () => {
       case 'application':
         return <Badge bg="success">有效</Badge>;
       case 'action':
-        if (field?.equals(Field(0))) {
+        if (field?.equals(Field(0)).toBoolean()) {
           return <Badge bg="success">空闲</Badge>;
         } else {
           return <Badge bg="danger">占用</Badge>;

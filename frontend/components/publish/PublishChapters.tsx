@@ -8,8 +8,6 @@ import { useIpfs, IpfsServerStatus } from '@/context/IpfsContext';
 import { useBackend } from '@/context/BackendContext';
 import { useWallet } from '@/context/WalletContext';
 import { processImageToJpegUint8 } from '@/interface/utils';
-import { Image_Link_Format_Regex } from '@/interface/knownoknownDag/knowledgeEntryDagInterface';
-import { checkImageWithTimeout, uint8ArrayToDataURL } from '@/interface/utils';
 
 export default function PublishChapters() {
   // 状态管理
@@ -144,13 +142,6 @@ export default function PublishChapters() {
     init();
   }, []);
   
-  // 清理临时图片URL
-  // useEffect(() => {
-  //   return () => {
-  //     tempImagePackCID.forEach(url => URL.revokeObjectURL(url));
-  //   };
-  // }, [tempImagePackCID]);
-  
   // 添加新章节
   const handleAddChapter = async () => {
     try {
@@ -159,9 +150,6 @@ export default function PublishChapters() {
       await fetchChapterTitles();
       setIsPacked(false);
       setActionLoading(false);
-      // 新章节会被添加到末尾，所以设置当前索引为最后一个
-      // setCurrentChapterIndex(chapterTitles.length);
-      // showToastNotification('添加章节成功', 'success');
     } catch (error) {
       console.error('添加章节失败:', error);
       showToastNotification('添加章节失败', 'danger');
@@ -226,7 +214,7 @@ export default function PublishChapters() {
         setCurrentChapterIndex(chapterOrder - 1);
       }
       if (titles && titles.length !== 0) {
-        await loadChapterContent(currentChapterIndex);
+        await loadChapterContent(chapterOrder - 1);
       } else {
         setCurrentChapter(null);
       }
@@ -283,14 +271,7 @@ export default function PublishChapters() {
   // 处理图片上传
   const handleImageUpload = async (file: File) => {
     try {
-      // console.log('Original file:', {
-      //   name: file.name,
-      //   type: file.type,
-      //   size: (file.size / 1024 / 1024).toFixed(2) + 'MB'
-      // });
       const processedUint8Array = await processImageToJpegUint8(file);
-      // console.log('Processed image Uint8Array:', processedUint8Array);
-      // console.log('Processed size:', (processedUint8Array.length / 1024 / 1024).toFixed(2) + 'MB');
       const customLink = await ipfsAddTempImage(processedUint8Array, file.type);
       console.log('Temp image custom link:', customLink);
       return customLink;
@@ -339,8 +320,8 @@ export default function PublishChapters() {
     }
   };
   
-  // 切换预览
-  const togglePreview = async () => {
+  // 启动预览
+  const startPreview = async () => {
     if (!currentChapter) {
       showToastNotification('当前章节为空', 'danger');
       return;
@@ -351,16 +332,24 @@ export default function PublishChapters() {
     }
     setPreviewLoading(true);
     setShowPreview(!showPreview);
-    if (!showPreview) {
-      await getPreviewContent();
-      setPreviewLoading(false);
-    } else {
-      if (tempImagePackCID) {
-        await backendDelTempImgPack(tempImagePackCID);
+    await getPreviewContent();
+    setPreviewLoading(false);
+  };
+
+  // 停止预览
+  const stopPreview = async () => {
+    setPreviewLoading(true);
+    if (tempImagePackCID) {
+      const {success} = await backendDelTempImgPack(tempImagePackCID);
+      if (success) {
+        setTempImagePackCID('');
+        showToastNotification('临时图片清理成功', 'success');
+      } else {
+        throw new Error('临时图片清理失败');
       }
-      setPreviewContent('');
-      setPreviewLoading(false);
     }
+    setPreviewLoading(false);
+    setShowPreview(false);
   };
 
   const getPreviewContent = async () => { // 生成解析自定义的图片外链并生成临时图片链接
@@ -634,7 +623,7 @@ export default function PublishChapters() {
                     <Button 
                       variant="outline-primary"
                       className="flex-grow-1 me-2"
-                      onClick={togglePreview}
+                      onClick={startPreview}
                       disabled={!currentChapter || previewLoading || actionLoading}
                     >
                       {previewLoading ? (
@@ -703,7 +692,7 @@ export default function PublishChapters() {
       {/* 预览模态框 */}
       <Modal
         show={showPreview}
-        onHide={() => setShowPreview(false)}
+        onHide={stopPreview}
         size="xl"
         dialogClassName="preview-modal"
         centered

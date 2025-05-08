@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useContext, useRef } from 'react';
-import { Container, Tabs, Tab, Card, Button, Spinner, Alert, Modal } from 'react-bootstrap';
-import { FaFileImport, FaFileExport, FaArrowRight, FaArrowLeft, FaWallet, FaExclamationTriangle, FaRedo } from 'react-icons/fa';
+import React, { useState, useEffect, useRef } from 'react';
+import { Container, Tabs, Tab, Card, Button, Spinner } from 'react-bootstrap';
+import { FaFileImport, FaFileExport, FaArrowRight, FaArrowLeft, FaRedo } from 'react-icons/fa';
 import PublishMetadata from '@/components/publish/PublishMetadata';
 import PublishChapters from '@/components/publish/PublishChapters';
 import PublishIntro from '@/components/publish/PublishIntro';
@@ -13,6 +13,8 @@ import { saveWithFileSystemAPI } from '@/interface/utils';
 import { useZkapp } from '@/context/ZkappContext';
 import { useModal } from '@/context/ModalContext';
 import { useBackend } from '@/context/BackendContext';
+import WalletConnectPrompt from '@/components/WalletConnectPrompt';
+
 export default function PublishPage() {
   // 当前活动的标签页
   const [activeTab, setActiveTab] = useState('basic-info');
@@ -24,10 +26,10 @@ export default function PublishPage() {
   const { showConfirm, showError, showSuccess, hideModal, showLoading } = useModal();
   
   // 钱包服务
-  const { walletStatus, connectWallet, getWalletKey } = useWallet();
+  const { walletStatus, getWalletKey } = useWallet();
 
   // 智能合约服务
-  const { zkappStatus, zkappPublishToContract, zkappWaitPublishToContract, zkappWaitMerkleRoot, getZkappFields } = useZkapp();
+  const { zkappPublishToContract, zkappWaitPublishToContract, zkappWaitMerkleRoot, getZkappFields } = useZkapp();
 
   // 后端服务
   const { backendPublishKnowledge } = useBackend();
@@ -134,7 +136,7 @@ export default function PublishPage() {
   
   // 处理重置工作流
   const handleResetWorkflow = async () => {
-    showConfirm('确定要重置当前工作流吗？这将清除所有未保存的内容。', '重置工作流', async () => {
+    showConfirm('确定要重置当前工作流吗？这将清除当前所有的内容。', '重置工作流', async () => {
         try {
           setResetting(true);
           await ipfsCreateNewKnowledge(localWalletStatus.address);
@@ -159,18 +161,19 @@ export default function PublishPage() {
   // 处理完成发布
   const handleFinishPublish = async () => {
     try {
-      setPageLoading(true);
+
+      // 显示加载模态框
+      showLoading("正在发布知识到区块链...", "知识发布");
+      // 检查知识是否已构建
       const builded = await ipfsCheckKnowledgeBuilded();
       
       if (!builded) {
-        setPageLoading(false);
-        showError("请完成知识构建后再发布知识实体。", "发布失败");
+        showError("请先在检测报告页面完成知识构建后再发布知识实体。", "知识未构建");
         return;
       }
 
       const privateKey = await getWalletKey();
       if (!privateKey) {
-        setPageLoading(false);
         showError("请先设置钱包密钥。", "发布失败");
         return;
       }
@@ -185,8 +188,8 @@ export default function PublishPage() {
       const zkappFileds = await getZkappFields();
       const knowledgePublishField = zkappFileds.publishKnowledgeCidHash.toString();
       if (knowledgePublishField !== '0') {
-        setPageLoading(false);
-        showError("合约发布申请状态被占用，请稍后再试，建议保存工作流", "发布失败");
+        hideModal();
+        showError("当前有其他知识正在发布中，请稍后再试。", "发布失败");
         return;
       }
       
@@ -194,33 +197,35 @@ export default function PublishPage() {
       const publishTime = await zkappPublishToContract('knowledge', knowledgePublishCID, privateKey);
       const waitPublish = await zkappWaitPublishToContract();
       if (!waitPublish) {
-        setPageLoading(false);
+        hideModal();
         showError("发布申请提交失败，合约状态未能更新", "发布失败");
         return;
       }
       const knowledgeCheckPackCarBytes = await ipfsGetKnowledgeCheckPackCarBytes();
       const {success, newMerkleRoot, oldMerkleRoot} = await backendPublishKnowledge(knowledgeCheckPackCarBytes);
       if (!success) {
-        setPageLoading(false);
+        hideModal();
         showError("发布失败，请检查知识是否合法!", "发布失败");
         return;
       }
 
       const waitMerkleRoot = await zkappWaitMerkleRoot('knowledge', oldMerkleRoot, newMerkleRoot);
       if (!waitMerkleRoot) {
-        setPageLoading(false);
+        hideModal();
         showError("发布失败，这是不该出现的情况!", "发布失败");
         return;
       }
 
       // 这里添加发布逻辑
       console.log('完成发布');
-
-      showSuccess("您的知识已成功发布！", "发布成功");
-      setPageLoading(false);
+      
+      // 显示成功模态框
+      showSuccess(
+        "知识发布成功！您的知识已成功发布到区块链和平台。",
+        "发布成功",
+      );
     } catch (error) {
       console.error('发布失败:', error);
-      setPageLoading(false);
       showError("知识发布过程中发生错误，请稍后重试。", "发布失败");
     }
   };
@@ -237,34 +242,7 @@ export default function PublishPage() {
   
   // 如果钱包未连接，显示连接提示
   if (!walletConnected) {
-    return (
-      <Container className="py-5">
-        <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '60vh' }}>
-          <div className="text-center mb-4">
-            <FaExclamationTriangle size={50} className="text-warning mb-3" />
-            <h4 className="mb-3">需要连接钱包</h4>
-            <p className="text-muted mb-4">发布知识需要连接钱包以进行身份验证和上链操作。</p>
-            <Alert variant="info" className="mb-4 text-start">
-              <p className="mb-1"><strong>为什么需要连接钱包？</strong></p>
-              <ul className="mb-0">
-                <li>验证您的身份</li>
-                <li>将知识内容安全地存储到IPFS</li>
-                <li>在Mina区块链上注册您的知识产权</li>
-              </ul>
-            </Alert>
-          </div>
-          <Button 
-            variant="primary" 
-            size="lg" 
-            className="d-flex align-items-center"
-            onClick={connectWallet}
-          >
-            <FaWallet className="me-2" />
-            连接钱包
-          </Button>
-        </div>
-      </Container>
-    );
+    return <WalletConnectPrompt />;
   }
   
   // 如果页面正在加载，显示加载状态
@@ -345,7 +323,7 @@ export default function PublishPage() {
           <Tab eventKey="knowledge-intro" title="知识简介" />
           <Tab eventKey="check-report" title="检测报告" />
         </Tabs>
-      </div>
+    </div>
       
       {/* 内容区域 */}
       <Card className="card-custom">

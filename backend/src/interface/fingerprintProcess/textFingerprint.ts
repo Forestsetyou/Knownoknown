@@ -90,7 +90,7 @@ class SimHashTF {
                 freqMap.set(word, (freqMap.get(word) || 0) + 1);
             }
         });
-        fs.writeFileSync(`wordFreqs${Date.now()}.json`, JSON.stringify(Object.fromEntries(freqMap.entries()), null, 2));
+        // fs.writeFileSync(`wordFreqs${Date.now()}.json`, JSON.stringify(Object.fromEntries(freqMap.entries()), null, 2));
         return freqMap;
     }
     

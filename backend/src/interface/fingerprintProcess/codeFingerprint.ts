@@ -367,11 +367,12 @@ class CodeNormalizer {
                 idx = end;
             }
             code_row +=origin_row.slice(idx);
-            code_row = code_row.replace(/\s+$/g, "");
+            code_row = code_row.replace(/\s+/g, "");
             norm_code_rows.push(code_row);
         }
         // console.log(this.varMap);
-        return norm_code_rows.join("\n");
+        // console.log(norm_code_rows.join(""));
+        return norm_code_rows.join("");
     }
 }
 /**

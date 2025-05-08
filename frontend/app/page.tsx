@@ -2,8 +2,9 @@
 
 import React from 'react';
 import { useRouter } from '@/context/RouterContext';
-import Publish from '@/components/Publish';
 import { Container } from 'react-bootstrap';
+import Publish from '@/components/Publish';
+import Verify from '@/components/Verify';
 
 // 页面组件映射
 const PageComponents: Record<string, React.ComponentType<any>> = {
@@ -20,12 +21,7 @@ const PageComponents: Record<string, React.ComponentType<any>> = {
       <p className="text-muted">此页面正在开发中...</p>
     </Container>
   ),
-  'verify': () => (
-    <Container className="py-3">
-      <h4 className="mb-4">验证页面</h4>
-      <p className="text-muted">此页面正在开发中...</p>
-    </Container>
-  ),
+  'verify': Verify,
   'reading': () => (
     <Container className="py-3">
       <h4 className="mb-4">阅读页面</h4>

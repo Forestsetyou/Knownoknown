@@ -33,40 +33,52 @@ interface Notice_Entry {	// notice_entry
     platform_notice_list: Array<Notice_Record> // 针对所有用户的消息通知
 }
 
-enum Application_Type {
-    Buy_Knowledge = 'Buy_Knowledge',
-    Claim_Income = 'Claim_Income',
+// enum Application_Type {
+//     Buy_Knowledge = 'Buy_Knowledge',
+//     Claim_Income = 'Claim_Income',
+// }
+
+// type Application_Buy_Knowledge_Record_data = {
+//     purchaser: User_Publickey,
+//     knowledge_id: Knowledge_ID,
+//     author: User_Publickey,
+//     transaction_hash: Transaction_Hash,
+//     cost: number,   // 付款金额
+// }
+
+// type Application_Claim_Income_Record_data = {
+//     purchaser: User_Publickey,
+//     author: User_Publickey,
+//     knowledge_id: Knowledge_ID,
+//     user_decrypter_cid: CID_Str,
+//     transaction_hash?: Transaction_Hash,
+//     income: number,   // 提款金额
+// }
+
+// type Application_Buy_Knowledge_Record = {
+//     id: Application_ID,
+//     done: boolean,
+//     type: Application_Type.Buy_Knowledge,
+//     data: Application_Buy_Knowledge_Record_data,
+// }
+
+// type Application_Claim_Income_Record = {
+//     id: Application_ID,
+//     done: boolean,
+//     type: Application_Type.Claim_Income,
+//     data: Application_Claim_Income_Record_data,
+// }
+
+enum Application_Status {
+    buy = 'buy',
+    verify = 'verify',
+    withdraw = 'withdraw',
 }
 
-type Application_Buy_Knowledge_Record_data = {
-    purchaser: User_Publickey,
-    knowledge_id: Knowledge_ID,
-    author: User_Publickey,
-    transaction_hash: Transaction_Hash,
-    cost: number,   // 付款金额
-}
-
-type Application_Claim_Income_Record_data = {
-    purchaser: User_Publickey,
-    author: User_Publickey,
-    knowledge_id: Knowledge_ID,
-    user_decrypter_cid: CID_Str,
-    transaction_hash?: Transaction_Hash,
-    income: number,   // 提款金额
-}
-
-type Application_Buy_Knowledge_Record = {
+type Application_Record = {
     id: Application_ID,
-    done: boolean,
-    type: Application_Type.Buy_Knowledge,
-    data: Application_Buy_Knowledge_Record_data,
-}
-
-type Application_Claim_Income_Record = {
-    id: Application_ID,
-    done: boolean,
-    type: Application_Type.Claim_Income,
-    data: Application_Claim_Income_Record_data,
+    status: boolean,
+    // data: Application_Claim_Income_Record_data | Application_Buy_Knowledge_Record_data,
 }
 
 interface Application_Entry {
