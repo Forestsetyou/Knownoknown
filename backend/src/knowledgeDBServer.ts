@@ -16,6 +16,8 @@ import { SimHash, TextSimilarity, TextScore } from "./interface/fingerprintProce
 import { PHash, ImageSimilarity, ImageScore } from './interface/fingerprintProcess/imageFingerprint.js'
 import { streamToBuffer } from './utils.js'
 import { Winnowing, CodeSimilarity, CodeScore } from './interface/fingerprintProcess/codeFingerprint.js';
+import { gcm } from '@noble/ciphers/aes';
+
 
 export class KnowledgeDBServer {
     private helia: HeliaLibp2p<Libp2p<ServiceMap>>;
@@ -82,7 +84,7 @@ export class KnowledgeDBServer {
     private async createNewDB() {   // 创建新的、完整的 Knowledge Dag Storage
         console.log("--------------create new db--------------");
         const star_entry: Star_Enrty = {
-            star_list: {}
+            star_list: []
         };   // 初始化收藏记录
         const comment_entry: Comment_Entry = {
             comment_list: []
@@ -207,6 +209,13 @@ export class KnowledgeDBServer {
         const newMetadataCID = await this.dagCbor.add(metadata);
         await this.knownoknownDagManager.setMetadata(newMetadataCID);
         console.log("new metadata:", metadata);
+
+        const knownoknownEntry: Knownoknown_Entry = (await this.dagCborGet(this.knownoknownDagManager.getCidKnownoknownEntry())) as Knownoknown_Entry;
+        knownoknownEntry.base_entry.metadata = newMetadataCID;
+        knownoknownEntry.base_entry.notice_entry = newNoticeEntryCID;
+        const newKnownoknownEntryCID = await this.dagCbor.add(knownoknownEntry);
+        await this.knownoknownDagManager.setKnownoknownEntry(newKnownoknownEntryCID);
+        console.log("new knownoknownEntry:", knownoknownEntry);
     }
 
     async publishKnowledge(knowledgeCheckPackCarBytes: Uint8Array, publishedCIDHash: string) {
@@ -398,6 +407,91 @@ export class KnowledgeDBServer {
         return carBytes;
     }
 
+    async changeStar(public_order_str: string, pbk: string) {
+        const public_order = Number(public_order_str);
+        const starEntry: Star_Enrty = (await this.dagCborGet(this.knownoknownDagManager.getCidStarEntry())) as Star_Enrty;
+        const starList = starEntry.star_list;
+
+        for (const [idx, star_record_cid] of starList.entries()) {
+            const star_record = (await this.dagCborGet(star_record_cid)) as any;
+            if (star_record.public_order === public_order && star_record.user === pbk) {
+                const newStarList = starList.filter((_, index) => index !== idx);
+                const newStarEntry = {
+                    star_list: newStarList,
+                }
+                const newStarEntryCID = await this.dagCbor.add(newStarEntry);
+                await this.knownoknownDagManager.setStarEntry(newStarEntryCID);
+                const knownoknownEntry: Knownoknown_Entry = (await this.dagCborGet(this.knownoknownDagManager.getCidKnownoknownEntry())) as Knownoknown_Entry;
+                knownoknownEntry.base_entry.star_entry = newStarEntryCID;
+                const newKnownoknownEntryCID = await this.dagCbor.add(knownoknownEntry);
+                await this.knownoknownDagManager.setKnownoknownEntry(newKnownoknownEntryCID);
+                return {success: true};
+            }
+        }
+
+        const knowledgeListEntry: Knowledge_List_Entry = (await this.dagCborGet(this.knownoknownDagManager.getCidKnowledgeListEntry())) as Knowledge_List_Entry;
+        const knowledgeEntryCID = knowledgeListEntry.knowledge_entry_list[public_order];
+        const knowledgeEntry: Knowledge_Entry = (await this.dagCborGet(knowledgeEntryCID)) as Knowledge_Entry;
+        const knowledgeMetadataCID = knowledgeEntry.metadata;
+        const knowledgeMetadata: Knowledge_Metadata = (await this.dagCborGet(knowledgeMetadataCID)) as Knowledge_Metadata;
+        const knowledgeID = knowledgeMetadata.id;
+
+        const newStarRecord = {
+            public_order: public_order,
+            user: pbk,
+            knowledge_id: knowledgeID,
+        }
+        const newStarRecordCID = await this.dagCbor.add(newStarRecord);
+        const newStarList = [...starList, newStarRecordCID];
+        const newStarEntry = {
+            star_list: newStarList,
+        }
+        console.log("newStarList:", newStarList);
+        const newStarEntryCID = await this.dagCbor.add(newStarEntry);
+        await this.knownoknownDagManager.setStarEntry(newStarEntryCID);
+        const knownoknownEntry: Knownoknown_Entry = (await this.dagCborGet(this.knownoknownDagManager.getCidKnownoknownEntry())) as Knownoknown_Entry;
+        knownoknownEntry.base_entry.star_entry = newStarEntryCID;
+        const newKnownoknownEntryCID = await this.dagCbor.add(knownoknownEntry);
+        await this.knownoknownDagManager.setKnownoknownEntry(newKnownoknownEntryCID);
+        return {success: true};
+    }
+
+    async decryptKnowledgeByTempKeyPackCarBytes(tempKeyPackCarBytes: Uint8Array) {
+        // 读取临时密钥包
+        const carReader = await CarReader.fromBytes(tempKeyPackCarBytes);
+        const tempKeyPackCid = (await carReader.getRoots())[0];
+        await this.car.import(carReader);
+        const tempKeyPack = (await this.dagCbor.get(tempKeyPackCid)) as any;
+        const { key, nonce, public_order } = tempKeyPack;
+
+        // 读取知识数据
+        const knownoknownEntryCID = this.knownoknownDagManager.getCidKnownoknownEntry();
+        const knownoknownEntry = (await this.dagCborGet(knownoknownEntryCID)) as any;
+        const knowledgeListEntryCID = knownoknownEntry.base_entry.knowledge_list_entry;
+        const knowledgeListEntry = (await this.dagCborGet(knowledgeListEntryCID)) as any;
+        const knowledgeEntryCID = knowledgeListEntry.knowledge_entry_list[public_order];
+        const knowledgeEntry = (await this.dagCborGet(knowledgeEntryCID)) as any;
+        const encryptedCarKnowledgeDataCID = knowledgeEntry.encrypted_car_knowledge_data;
+        const encryptedCarKnowledgeData = await streamToBuffer(this.fs.cat(encryptedCarKnowledgeDataCID));
+        // console.log("key:", key);
+        // console.log("key type:", typeof key);
+        // console.log("nonce:", nonce);
+        // console.log("nonce type:", typeof nonce);
+        const carBytes = gcm(new Uint8Array(key), new Uint8Array(nonce)).decrypt(encryptedCarKnowledgeData);
+        return carBytes;
+        // const knowledgeMetadataCID = knowledgeEntry.metadata;
+        // const knowledgeMetadata = (await this.dagCborGet(knowledgeMetadataCID)) as any;
+        // const carReader = await CarReader.fromBytes(carBytes);
+        // const knowledgeDataCid = (await carReader.getRoots())[0];
+        // console.log("knowledgeDataCid:", knowledgeDataCid.toString());
+        // if (knowledgeMetadata.id === knowledgeDataCid.toString()) {
+        //     return { success: true }
+        // } else {
+        //     return { success: false }
+        // }
+    }
+    
+    // 以下是临时图片包管理方法
     async addTempImgPack(tempImgPackCarBytes: Uint8Array) {
         const carReader = await CarReader.fromBytes(tempImgPackCarBytes);
         const tempImgPackCid = (await carReader.getRoots())[0];

@@ -3,9 +3,18 @@ import { Container, Alert, Spinner } from 'react-bootstrap';
 import { StatusChecker } from "@/interface/utilTypes";
 import { IpfsService, IpfsServiceInit, IpfsServiceStatus, IpfsServerStatus } from "@/service/ipfsService";
 import { useBackend, BackendServiceStatus, BackendServerStatus } from '@/context/BackendContext';
+import { useRouter } from './RouterContext';
+
+export interface goToReadKnowledgePack {
+  public_order: number;
+  pbk: string;
+  pvk: string;
+  metadata: any;
+}
 
 interface IpfsContextType {
     ipfsStatus: IpfsServiceStatus;
+    goToReadKnowledgePack: goToReadKnowledgePack;
     getIpfsStatus: () => Promise<IpfsServiceStatus>;
     ipfsCreateNewKnowledge: (address: string) => Promise<void>;
     ipfsGetKnowledgeMetadata: () => Promise<any>;
@@ -38,6 +47,11 @@ interface IpfsContextType {
     ipfsGetKnowledgePublishCID: () => Promise<string>;
     ipfsGetKnowledgeCheckPackCarBytes: () => Promise<Uint8Array>;
     ipfsGetTempImgPackCarBytes: (chapterIndex: number, walletAddress: string) => Promise<Uint8Array>;
+    ipfsGetKnowledgeIntroSimples: (user: string, keywords: string) => Promise<any>;
+    ipfsGetKnowledgeIntroPack: (public_order: number) => Promise<any>;
+    ipfsGoToReadKnowledge: (public_order: number, pvk: string, pbk: string, metadata: any) => Promise<void>;
+    ipfsDecryptKnowledgeCarData: (public_order: number, decryptedKey: Uint8Array, decryptedNonce: Uint8Array) => Promise<boolean>;
+    ipfsLocalDecryptKnowledgeData: (public_order: number, keys: any) => Promise<boolean>;
 }
 
 const IpfsContext = createContext<IpfsContextType | undefined>(undefined);
@@ -49,13 +63,23 @@ const defaultIpfsStatus : IpfsServiceStatus = {
     knownoknownEntryCID: '',
 }
 
+const defaultGoToReadKnowledgePack : goToReadKnowledgePack = {
+    public_order: -1,
+    pbk: '',
+    pvk: '',
+    metadata: {},
+}
+
 
 const IpfsProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [ipfsStatus, setIpfsStatus] = useState<IpfsServiceStatus>(defaultIpfsStatus);
     const [localIpfsService, setLocalIpfsService] = useState<IpfsService | undefined>(undefined);
+    const [goToReadKnowledgePack, setGoToReadKnowledgePack] = useState<goToReadKnowledgePack>(defaultGoToReadKnowledgePack);
 
     // sync with backend status
-    const { backendStatus, getBackendStatus, backendExtractFingerprintData } = useBackend();
+    const { backendStatus, getBackendStatus, backendExtractFingerprintData, backendGetDecryptedKnowledgeCarBytes } = useBackend();
+    // 路由服务
+    const { currentRoute, navigate } = useRouter();
   
     // for initialization
     const [initialized, setInitialized] = useState(false);
@@ -252,6 +276,39 @@ const IpfsProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       return tempImgPackCarBytes;
     }
 
+    const getKnowledgeIntroSimples = async (user: string, keywords: string) => {
+      await resetKnownoknownDag();
+      const knowledgeIntroSimples = await localIpfsService!.getKnowledgeIntroSimples(user, keywords);
+      return knowledgeIntroSimples;
+    }
+
+    const getKnowledgeIntroPack = async (public_order: number) => {
+      const knowledgeIntroPack = await localIpfsService!.getKnowledgeIntroPack(public_order);
+      return knowledgeIntroPack;
+    }
+
+    const goToReadKnowledge = async (public_order: number, pvk: string, pbk: string, metadata: any) => {
+      setGoToReadKnowledgePack({
+        public_order: public_order,
+        pvk: pvk,
+        pbk: pbk,
+        metadata: metadata,
+      });
+      navigate('reading' as any);
+    }
+
+    const decryptKnowledgeCarData = async (public_order: number, decryptedKey: Uint8Array, decryptedNonce: Uint8Array) => {
+      const tempKeyPackCarBytes = await localIpfsService!.generateTempKeyPackCarBytes(public_order, decryptedKey, decryptedNonce);
+      const decryptedKnowledgeCarBytes = await backendGetDecryptedKnowledgeCarBytes(tempKeyPackCarBytes);
+      const success = await localIpfsService!.importDecryptedKnowledgeCarData(decryptedKnowledgeCarBytes);
+      return success;
+    }
+
+    const localDecryptKnowledgeData = async (public_order: number, keys: any) => {
+      const success = await localIpfsService!.decryptKnowledgeData(public_order, keys);
+      return success;
+    }
+
     // 如果系统尚未初始化，显示加载中
     if (!initialized) {
       return (
@@ -289,6 +346,7 @@ const IpfsProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       <IpfsContext.Provider 
         value={{ 
           ipfsStatus: ipfsStatus, 
+          goToReadKnowledgePack: goToReadKnowledgePack,
           getIpfsStatus, 
           ipfsCreateNewKnowledge: createNewKnowledge, 
           ipfsGetKnowledgeMetadata: getKnowledgeMetadata, 
@@ -321,6 +379,11 @@ const IpfsProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           ipfsGetKnowledgePublishCID: getKnowledgePublishCID,
           ipfsGetKnowledgeCheckPackCarBytes: getKnowledgeCheckPackCarBytes,
           ipfsGetTempImgPackCarBytes: getTempImgPackCarBytes,
+          ipfsGetKnowledgeIntroSimples: getKnowledgeIntroSimples,
+          ipfsGetKnowledgeIntroPack: getKnowledgeIntroPack,
+          ipfsGoToReadKnowledge: goToReadKnowledge,
+          ipfsDecryptKnowledgeCarData: decryptKnowledgeCarData,
+          ipfsLocalDecryptKnowledgeData: localDecryptKnowledgeData,
         }}
       >
         {children}

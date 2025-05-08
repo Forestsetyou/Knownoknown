@@ -19,7 +19,9 @@ enum backendUrl {
   ROUTER_PUBLISH_KNOWLEDGE="/admin/publish-knowledge",
   ROUTER_SET_TEMP_IMG_PACK="/admin/tempImg/set",
   ROUTER_DEL_TEMP_IMG_PACK="/admin/tempImg/del/:cid",
-  ROUTER_GET_TEMP_IMG_URLS="/admin/tempImg/get/:cid"
+  ROUTER_GET_TEMP_IMG_URLS="/admin/tempImg/get/:cid",
+  ROUTER_CHANGE_STAR="/admin/service/change-star",
+  ROUTER_GET_DECRYPTED_KNOWLEDGE_CAR_Bytes="/admin/service/decrypt-knowledge",
 }
 
 const TIMEOUT = 10000;  // 10 seconds
@@ -153,6 +155,36 @@ class LocalBackendService {
       tempImgTempLinks[image_link] = temp_link;
     }
     return tempImgTempLinks;
+  }
+
+  async changeStar(public_order: string, pbk: string) {
+    const changeStar_url = backendUrl.BASE_URL+backendUrl.ROUTER_CHANGE_STAR;
+    const rep = await fetch(changeStar_url, {
+      method: "POST",
+      body: JSON.stringify({public_order, pbk}),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(TIMEOUT),
+    })
+    if (!rep.ok) throw new Error(await rep.text());
+    const repBody = await rep.json();
+    return {success: repBody.success};
+  }
+
+  async getDecryptedKnowledgeCarBytes(tempKeyPackCarBytes: Uint8Array) {
+    const getDecryptedKnowledgeCarBytes_url = backendUrl.BASE_URL+backendUrl.ROUTER_GET_DECRYPTED_KNOWLEDGE_CAR_Bytes;
+    const rep = await fetch(getDecryptedKnowledgeCarBytes_url, {
+      method: "POST",
+      body: tempKeyPackCarBytes,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+      },
+      signal: AbortSignal.timeout(TIMEOUT),
+    })
+    if (!rep.ok) throw new Error(await rep.text());
+    const decryptedKnowledgeCarBytes = new Uint8Array(await rep.arrayBuffer());
+    return decryptedKnowledgeCarBytes;
   }
 }
 

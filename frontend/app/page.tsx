@@ -5,15 +5,12 @@ import { useRouter } from '@/context/RouterContext';
 import { Container } from 'react-bootstrap';
 import Publish from '@/components/Publish';
 import Verify from '@/components/Verify';
+import Discover from '@/components/Discover';
+import Reading from '@/components/Reading';
 
 // 页面组件映射
 const PageComponents: Record<string, React.ComponentType<any>> = {
-  'discover': () => (
-    <Container className="py-3">
-      <h4 className="mb-4">发现页面</h4>
-      <p className="text-muted">此页面正在开发中...</p>
-    </Container>
-  ),
+  'discover': Discover,
   'publish': Publish,
   'notifications': () => (
     <Container className="py-3">
@@ -22,12 +19,7 @@ const PageComponents: Record<string, React.ComponentType<any>> = {
     </Container>
   ),
   'verify': Verify,
-  'reading': () => (
-    <Container className="py-3">
-      <h4 className="mb-4">阅读页面</h4>
-      <p className="text-muted">此页面正在开发中...</p>
-    </Container>
-  ),
+  'reading': Reading,
   'profile': () => (
     <Container className="py-3">
       <h4 className="mb-4">个人页面</h4>

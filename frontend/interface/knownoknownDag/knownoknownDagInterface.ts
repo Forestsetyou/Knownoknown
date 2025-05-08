@@ -1,5 +1,5 @@
 import { CID } from 'multiformats/cid';
-import { Knowledge_Entry, Knowledge_ID, Md_Data, Pure_Text_Fingerprint, Code_Section_Fingerprint, Image_Fingerprint, Knowledge_Metadata, Checkreport, Public_Order } from './knowledgeEntryDagInterface';
+import { Knowledge_Entry, Knowledge_ID, Md_Data, Pure_Text_Fingerprint, Code_Section_Fingerprint, Image_Fingerprint, Knowledge_Metadata, Checkreport, Public_Order, Decryption_Keys, Image_Data } from './knowledgeEntryDagInterface';
 import { User_Publickey, CID_Str } from './utils';
 
 type Notice_ID = number;
@@ -26,50 +26,64 @@ type Notice_Record = {
     timestamp: number, // 通知时间
 }
 
-// type User_Notice = {	// user_notice
-//     user: User_Publickey,	// 用户地址
-// 	notice_list: Array<Notice_Record>
-// }
+type User_Notice = Array<Notice_Record>;
 
 interface Notice_Entry {	// notice_entry
-	user_notice_list: Record<User_Publickey, CID>, // 按照用户罗列通知信息, cid-> Array<Notice_Record>
+	user_notice_list: Record<User_Publickey, CID>, // 按照用户罗列通知信息, cid-> User_Notice
     platform_notice_list: Array<Notice_Record> // 针对所有用户的消息通知
 }
 
-enum Application_Type {
-    Buy_Knowledge = 'Buy_Knowledge',
-    Claim_Income = 'Claim_Income',
+// enum Application_Type {
+//     Buy_Knowledge = 'Buy_Knowledge',
+//     Claim_Income = 'Claim_Income',
+// }
+
+// type Application_Buy_Knowledge_Record_data = {
+//     purchaser: User_Publickey,
+//     knowledge_id: Knowledge_ID,
+//     author: User_Publickey,
+//     transaction_hash: Transaction_Hash,
+//     cost: number,   // 付款金额
+// }
+
+// type Application_Claim_Income_Record_data = {
+//     purchaser: User_Publickey,
+//     author: User_Publickey,
+//     knowledge_id: Knowledge_ID,
+//     user_decrypter_cid: CID_Str,
+//     transaction_hash?: Transaction_Hash,
+//     income: number,   // 提款金额
+// }
+
+// type Application_Buy_Knowledge_Record = {
+//     id: Application_ID,
+//     done: boolean,
+//     type: Application_Type.Buy_Knowledge,
+//     data: Application_Buy_Knowledge_Record_data,
+// }
+
+// type Application_Claim_Income_Record = {
+//     id: Application_ID,
+//     done: boolean,
+//     type: Application_Type.Claim_Income,
+//     data: Application_Claim_Income_Record_data,
+// }
+
+enum Application_Status {
+    buy = 'buy',    // 用户提交购买申请
+    verify = 'verify', // 创作者分发密钥
+    withdraw = 'withdraw',  // 用户提款
 }
 
-type Application_Buy_Knowledge_Record_data = {
+type Application_Record = {
+    id: Application_ID,
+    status: Application_Status,
     purchaser: User_Publickey,
-    knowledge_id: Knowledge_ID,
     author: User_Publickey,
-    transaction_hash: Transaction_Hash,
+    knowledge_id: Knowledge_ID,
     cost: number,   // 付款金额
-}
-
-type Application_Claim_Income_Record_data = {
-    purchaser: User_Publickey,
-    author: User_Publickey,
-    knowledge_id: Knowledge_ID,
-    user_decrypter_cid: CID_Str,
-    transaction_hash?: Transaction_Hash,
-    income: number,   // 提款金额
-}
-
-type Application_Buy_Knowledge_Record = {
-    id: Application_ID,
-    done: boolean,
-    type: Application_Type.Buy_Knowledge,
-    data: Application_Buy_Knowledge_Record_data,
-}
-
-type Application_Claim_Income_Record = {
-    id: Application_ID,
-    done: boolean,
-    type: Application_Type.Claim_Income,
-    data: Application_Claim_Income_Record_data,
+    purchase_txn_hash: Transaction_Hash,
+    withdraw_txn_hash?: Transaction_Hash,
 }
 
 interface Application_Entry {
@@ -79,6 +93,7 @@ interface Application_Entry {
 interface Comment_Record {	// comment_record
     comment_id: Comment_ID,	// 评论的id, 即comment在comment_entry中的位序
     knowledge_id: Knowledge_ID,	// 所评论的知识的id
+    public_order: Public_Order,	// 所评论的知识的public_order
     commenter: User_Publickey,	// 评论者的地址
     comment_text: string,	// 评论内容
 }
@@ -99,8 +114,14 @@ interface Knowledge_Comment_Index_Entry {
     knowledge_comment_index_list: Array<Array<CID_Str>> // cid->comment_record
 };
 
+interface Star_Record {
+    knowledge_id: Knowledge_ID,
+    user: User_Publickey,
+    public_order: Public_Order,
+}
+
 interface Star_Enrty {
-    star_list: Record<User_Publickey, Array<Public_Order>> // cid->star_record
+    star_list: Array<CID> // cid->star_record
 };
 
 // {	// fingerprint_index_entry
@@ -161,4 +182,20 @@ interface Knownoknown_Entry {	// KnowNoKnownEntry
     },
 }
 
-export type { Knownoknown_Entry, Knowledge_List_Entry, Notice_Entry, Application_Entry, Comment_Entry, Star_Enrty, Knowledge_Comment_Index_Entry, Fingerprint_Index_Entry, Knowledge_Metadata_Index_Entry, Knowledge_Checkreport_Index_Entry, Knownoknown_Metadata, Notice_Record };
+interface Knowledge_Intro_Pack {
+    metadata: Knowledge_Metadata,
+    check_report: Checkreport,
+    comments: Array<Comment_Record>,
+    // stars: Array<Star_Record>,
+}
+
+interface Knowledge_Intro_Simple {
+    metadata: Knowledge_Metadata,
+    cover: Image_Data,
+    check_report_score: number,
+    is_stared: boolean,
+    stars_num: number,
+    comments_num: number,
+}
+
+export type { Knownoknown_Entry, Knowledge_List_Entry, Notice_Entry, Application_Entry, Comment_Entry, Star_Enrty, Knowledge_Comment_Index_Entry, Fingerprint_Index_Entry, Knowledge_Metadata_Index_Entry, Knowledge_Checkreport_Index_Entry, Knownoknown_Metadata, Notice_Record, User_Notice, Application_Record, Knowledge_Intro_Pack, Knowledge_Intro_Simple };

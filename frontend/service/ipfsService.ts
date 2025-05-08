@@ -235,7 +235,7 @@ class IpfsService {
         await this.knowledgeCheckPackManager.reset();
         const newKnowledgeMetadata = {
             id: '',
-            public_order: 0,
+            public_order: -1,
             title: '',
             author: walletAddress,
             price: 0,
@@ -246,6 +246,8 @@ class IpfsService {
                 content: '',
             },
             tags: [],
+            decryption_keys: {},
+            timestamp: new Date().getTime(),
         };
         const newKnowledgeMetadataCID = await this.dagCbor.add(newKnowledgeMetadata);
         await this.knowledgeCheckPackManager.setKnowledgeMetadata(newKnowledgeMetadataCID);
@@ -578,6 +580,14 @@ class IpfsService {
         // console.log('checkReport', checkReport);
         const checkReportCID = await this.dagCbor.add(checkReport);
         await this.knowledgeCheckPackManager.setCheckReport(checkReportCID);
+
+        const metadataCID = this.knowledgeCheckPackManager.getKnowledgeMetadata();
+        const metadata = (await this.dagCbor.get(metadataCID!)) as any;
+        console.log('metadata', metadata);
+        const knowledge_list_entry = (await this.dagCbor.get(knownoknownEntry.base_entry.knowledge_list_entry)) as any;
+        metadata.public_order = knowledge_list_entry.knowledge_entry_list.length;
+        const newMetadataCID = await this.dagCbor.add(metadata);
+        await this.knowledgeCheckPackManager.setKnowledgeMetadata(newMetadataCID);
     }
 
     async getCheckReport() {
@@ -612,8 +622,19 @@ class IpfsService {
         const { key, nonce } = keys;
         const carBytes = await this.getKnowledgeDataCarBytes();
         const encryptedCarKnowledgeData = gcm(key, nonce).encrypt(carBytes);
-        const encryptedCarKnowledgeDataCID = await this.dagCbor.add(encryptedCarKnowledgeData);
+        const encryptedCarKnowledgeDataCID = await this.fs.addBytes(encryptedCarKnowledgeData);
         return encryptedCarKnowledgeDataCID;
+    }
+
+    // 浏览器环境有奇怪的BUG，改用后端解密
+    async decryptCarKnowledgeData(keys: any, encryptedCarKnowledgeData: Uint8Array) {
+        const { key, nonce } = keys;
+        console.log('key', key);
+        console.log('key type', typeof key);
+        console.log('nonce', nonce);
+        console.log('nonce type', typeof nonce);
+        const carBytes = gcm(key, nonce).decrypt(encryptedCarKnowledgeData);
+        return carBytes;
     }
 
     async buildKnowledge(keys: any, encryptedKeys: any, publicKey: string) {
@@ -631,15 +652,21 @@ class IpfsService {
         if (knowledgeMetadata.sale_volume === 0) {
             decryptionKeys.free = keys;
         }
+        knowledgeMetadata.decryption_keys = decryptionKeys;
+        knowledgeMetadata.timestamp = new Date().getTime();
+        const newKnowledgeMetadataCID = await this.dagCbor.add(knowledgeMetadata);
+        await this.knowledgeCheckPackManager.setKnowledgeMetadata(newKnowledgeMetadataCID);
+        // console.log('buildKnowledge: newKnowledgeMetadataCID', newKnowledgeMetadataCID.toString())
+
         const encryptedCarKnowledgeDataCID = await this.encryptCarKnowledgeData(keys);
+
         await this.knowledgeCheckPackManager.pinAdd(encryptedCarKnowledgeDataCID);
         const fingerprintDataCID = this.knowledgeCheckPackManager.getFingerprintData();
         const checkReportCID = this.knowledgeCheckPackManager.getCheckReport();
         const knowledgeDataCID = this.knowledgeCheckPackManager.getKnowledgeData();
         const knowledgeEntry = {
-            metadata: knowledgeMetadataCID,
+            metadata: newKnowledgeMetadataCID,
             encrypted_car_knowledge_data: encryptedCarKnowledgeDataCID,
-            decryption_keys: decryptionKeys,
             fingerprint_data: fingerprintDataCID,
             check_report: checkReportCID,
         }
@@ -653,11 +680,10 @@ class IpfsService {
         const knowledgeCheckPackCID = await this.dagCbor.add(knowledgeCheckPack);
         await this.knowledgeCheckPackManager.setKnowledgeCheckPack(knowledgeCheckPackCID);
         await this.knowledgeCheckPackManager.pinRm(knowledgeEntryCID);
-        console.log('knowledgeEntry', knowledgeEntry)
-        console.log('knowledgeCheckPack', knowledgeCheckPack)
     }
 
     async checkKnowledgeBuilded() {
+        // console.log('checkKnowledgeBuilded')
         if (!(await this.checkKnowledgeDataPacked()) || !(await this.checkFingerprintData()) || !(await this.checkCheckReport())) {
             return false;
         }
@@ -677,8 +703,8 @@ class IpfsService {
         if (knowledgeEntry.check_report.toString() !== this.knowledgeCheckPackManager.getCheckReport()!.toString()) {
             return false;
         }
-        console.log('build check knowledgeEntry', knowledgeEntry)
-        console.log('build check knowledgeCheckPack', knowledgeCheckPack)
+        // console.log('build check knowledgeEntry', knowledgeEntry)
+        // console.log('build check knowledgeCheckPack', knowledgeCheckPack)
         return true;
     }
 
@@ -745,6 +771,155 @@ class IpfsService {
         const carBytes = await streamToUint8Array(carStreamReader);
         console.log('knowledgeCheckPackCarBytesLength', carBytes.length);
         return carBytes;
+    }
+
+    async getKnowledgeIntroSimples(user: string, keywords: string = '') {
+        keywords = keywords.trim();
+        const knownoknownEntryCID = this.knownoknownDagManager.getKnownoknownEntryCID()!;
+        const knownoknownEntry = (await this.dagCborGet(knownoknownEntryCID)) as any;
+        const knowledgeIntroSimples = [];
+        const knowledge_metadata_index_entry = (await this.dagCborGet(knownoknownEntry.index_entry.knowledge_metadata_index_entry)) as any;
+
+        for (const knowledge_metadata_cid_str of knowledge_metadata_index_entry.knowledge_metadata_index_list) {
+            const knowledge_metadata_cid = CID.parse(knowledge_metadata_cid_str);
+            const knowledge_metadata = (await this.dagCborGet(knowledge_metadata_cid)) as any;
+            if (keywords && !knowledge_metadata.title.includes(keywords) && !knowledge_metadata.tags.includes(keywords)) {
+                continue;
+            }
+            const cover = await streamToUint8Array(this.fs.cat(knowledge_metadata.intro.image));
+            const knowledgeIntroSimple = {
+                metadata: knowledge_metadata,
+                cover: cover,
+                check_report_score: {},
+                is_stared: false,
+                stars_num: 0,
+                comments_num: 0,
+            }
+            knowledgeIntroSimples.push(knowledgeIntroSimple);
+        }
+        
+        const knowledge_checkreport_index_entry = (await this.dagCborGet(knownoknownEntry.index_entry.knowledge_checkreport_index_entry)) as any;
+        console.log('knowledge_checkreport_index_entry', knowledge_checkreport_index_entry);
+        for (const [idx, knowledge_checkreport_cid_str] of knowledge_checkreport_index_entry.knowledge_checkreport_index_list.entries()) {
+            console.log('knowledge_checkreport_cid_str', knowledge_checkreport_cid_str);
+            const knowledge_checkreport_cid = CID.parse(knowledge_checkreport_cid_str);
+            const knowledge_checkreport = (await this.dagCborGet(knowledge_checkreport_cid)) as any;
+            knowledgeIntroSimples[idx].check_report_score = {
+                text_score: knowledge_checkreport.pure_text_score,
+                image_score: knowledge_checkreport.image_score,
+                code_score: knowledge_checkreport.code_section_score,
+            };
+        }
+
+        const comment_entry = (await this.dagCborGet(knownoknownEntry.base_entry.comment_entry)) as any;
+        for (const comment_record_cid of comment_entry.comment_list) {
+            const comment_record = (await this.dagCborGet(comment_record_cid)) as any;
+            knowledgeIntroSimples[comment_record.public_order].comments_num += 1;
+        }
+
+        if (user) {
+            const star_entry = (await this.dagCborGet(knownoknownEntry.base_entry.star_entry)) as any;
+            // console.log('star_entry.star_list', star_entry.star_list);
+            for (const star_record_cid of star_entry.star_list) {
+                const star_record = (await this.dagCborGet(star_record_cid)) as any;
+                // console.log('star_record', star_record);
+                if (star_record.user === user) {
+                    knowledgeIntroSimples[star_record.public_order].is_stared = true;
+                }
+                knowledgeIntroSimples[star_record.public_order].stars_num += 1;
+            }
+        }
+
+        return knowledgeIntroSimples;
+    }
+
+    async getKnowledgeIntroPack(public_order: number) {
+        const knownoknownEntryCID = this.knownoknownDagManager.getKnownoknownEntryCID()!;
+        const knownoknownEntry = (await this.dagCborGet(knownoknownEntryCID)) as any;
+        const knowledge_intro_pack = {
+            check_report: {},
+            comments: [] as Array<any>,
+            decryption_keys: {},
+        }
+        const knowledge_checkreport_index_entry = (await this.dagCborGet(knownoknownEntry.index_entry.knowledge_checkreport_index_entry)) as any;
+        const check_report_cid_str = knowledge_checkreport_index_entry.knowledge_checkreport_index_list[public_order];
+        const check_report = (await this.dagCborGet(CID.parse(check_report_cid_str))) as any;
+        knowledge_intro_pack.check_report = check_report;
+
+        const comment_entry = (await this.dagCborGet(knownoknownEntry.base_entry.comment_entry)) as any;
+        for (const comment_record_cid of comment_entry.comment_list) {
+            const comment_record = (await this.dagCborGet(comment_record_cid)) as any;
+            if (comment_record.public_order === public_order) {
+                knowledge_intro_pack.comments.push(comment_record);
+            }
+        }
+
+        return knowledge_intro_pack;
+    }
+
+    // 浏览器环境下有BUG，解密交给后端实现
+    async decryptKnowledgeData(public_order: number, keys: any) {
+        console.log('decryption keys:', keys);
+        await this.knowledgeCheckPackManager.rmChapterData(0);
+        const knownoknownEntryCID = this.knownoknownDagManager.getKnownoknownEntryCID()!;
+        const knownoknownEntry = (await this.dagCborGet(knownoknownEntryCID)) as any;
+        const knowledgeListEntryCID = knownoknownEntry.base_entry.knowledge_list_entry;
+        const knowledgeListEntry = (await this.dagCborGet(knowledgeListEntryCID)) as any;
+        const knowledgeEntryCID = knowledgeListEntry.knowledge_entry_list[public_order];
+        const knowledgeEntry = (await this.dagCborGet(knowledgeEntryCID)) as any;
+        const encryptedCarKnowledgeDataCID = knowledgeEntry.encrypted_car_knowledge_data;
+        console.log('encryptedCarKnowledgeDataCID', encryptedCarKnowledgeDataCID.toString());
+        const encryptedCarKnowledgeBytes = await streamToUint8Array(this.fs.cat(encryptedCarKnowledgeDataCID));
+        const decryptedCarKnowledgeBytes = await this.decryptCarKnowledgeData(keys, encryptedCarKnowledgeBytes as Uint8Array);
+        const carReader = await CarReader.fromBytes(decryptedCarKnowledgeBytes);
+        const knowledgeDataCID = (await carReader.getRoots())[0];
+        console.log('knowledgeDataCID', knowledgeDataCID.toString());
+        await this.car.import(carReader);
+        await this.knowledgeCheckPackManager.pinAdd(knowledgeDataCID);  
+
+        const knowledgeData = (await this.dagCborGet(knowledgeDataCID)) as any;
+        const chapterDataCIDArr = knowledgeData.chapters;
+        const chapterDatas = [];
+        for (const chapterDataCID of chapterDataCIDArr) {
+            await this.knowledgeCheckPackManager.addChapterData(chapterDataCID);
+            const chapterData = (await this.dagCborGet(chapterDataCID)) as any;
+            console.log('chapterData', chapterData);
+            chapterDatas.push(chapterData);
+        }
+        await this.knowledgeCheckPackManager.pinRm(knowledgeDataCID);  
+        return true;
+    }
+
+    async generateTempKeyPackCarBytes(public_order: number, decryptedKey: Uint8Array, decryptedNonce: Uint8Array) {
+        const tempKeyPack = {
+            key: decryptedKey,
+            nonce: decryptedNonce,
+            public_order: public_order,
+        }
+        const tempKeyPackCID = await this.dagCbor.add(tempKeyPack);
+        const carBytes = await streamToUint8Array(this.car.stream(tempKeyPackCID));
+        return carBytes;
+    }
+
+    async importDecryptedKnowledgeCarData(decryptedKnowledgeDataCarBytes: Uint8Array) {
+        await this.knowledgeCheckPackManager.rmChapterData(0);
+        const carReader = await CarReader.fromBytes(decryptedKnowledgeDataCarBytes);
+        const knowledgeDataCID = (await carReader.getRoots())[0];
+        console.log('knowledgeDataCID', knowledgeDataCID.toString());
+        await this.car.import(carReader);
+        await this.knowledgeCheckPackManager.pinAdd(knowledgeDataCID);  
+
+        const knowledgeData = (await this.dagCborGet(knowledgeDataCID)) as any;
+        const chapterDataCIDArr = knowledgeData.chapters;
+        const chapterDatas = [];
+        for (const chapterDataCID of chapterDataCIDArr) {
+            await this.knowledgeCheckPackManager.addChapterData(chapterDataCID);
+            const chapterData = (await this.dagCborGet(chapterDataCID)) as any;
+            console.log('chapterData', chapterData);
+            chapterDatas.push(chapterData);
+        }
+        await this.knowledgeCheckPackManager.pinRm(knowledgeDataCID);  
+        return true;
     }
 
     // 以下是临时图片管理方法

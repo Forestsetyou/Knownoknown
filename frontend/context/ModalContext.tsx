@@ -55,6 +55,8 @@ export const ModalProvider: React.FC<{children: ReactNode}> = ({ children }) => 
   const showModal = (options: Partial<ModalState>) => {
     setModalState({
       ...defaultModalState,
+      size: undefined,
+      onHide: undefined,
       ...options,
       isOpen: true
     });
@@ -66,7 +68,6 @@ export const ModalProvider: React.FC<{children: ReactNode}> = ({ children }) => 
       ...prev,
       isOpen: false,
       onHide: undefined,
-      size: undefined,
     }));
   };
 
@@ -76,7 +77,7 @@ export const ModalProvider: React.FC<{children: ReactNode}> = ({ children }) => 
       type: 'loading',
       title,
       message,
-      closable: false
+      closable: false,
     });
   };
 
@@ -88,7 +89,7 @@ export const ModalProvider: React.FC<{children: ReactNode}> = ({ children }) => 
       message,
       confirmText: '确定',
       onConfirm: onConfirm || hideModal,
-      closable: true
+      closable: true,
     });
   };
 
@@ -100,7 +101,7 @@ export const ModalProvider: React.FC<{children: ReactNode}> = ({ children }) => 
       message,
       confirmText: '确定',
       onConfirm: onConfirm || hideModal,
-      closable: true
+      closable: true,
     });
   };
 
@@ -119,7 +120,7 @@ export const ModalProvider: React.FC<{children: ReactNode}> = ({ children }) => 
       cancelText: '取消',
       onConfirm: onConfirm || hideModal,
       onCancel: onCancel || hideModal,
-      closable: true
+      closable: true,
     });
   };
 

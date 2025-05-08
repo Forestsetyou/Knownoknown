@@ -11,6 +11,8 @@ interface BackendContextType {
     backendSetTempImgPack: (tempImgPackCarBytes: Uint8Array) => Promise<{success: boolean, cid: string}>;
     backendDelTempImgPack: (tempImgPackCid: string) => Promise<{success: boolean}>;
     backendGetTempImgTempLinks: (images: any) => Promise<any>;
+    backendChangeStar: (public_order: string, pbk: string) => Promise<{success: boolean}>;
+    backendGetDecryptedKnowledgeCarBytes: (tempKeyPackCarBytes: Uint8Array) => Promise<Uint8Array>;
 }
 
 const BackendContext = createContext<BackendContextType | undefined>(undefined);
@@ -85,12 +87,23 @@ const BackendProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
     const delTempImgPack = async (tempImgPackCid: string) => {
         const {success} = await localBackendService!.delTempImgPack(tempImgPackCid);
+        console.log('临时图片清理:', success);
         return {success};
     }
 
     const getTempImgTempLinks = async (images: any) => {
         const tempImgTempLinks = await localBackendService!.getTempImgTempLinks(images);
         return tempImgTempLinks;
+    }
+
+    const changeStar = async (public_order: string, pbk: string) => {
+        const {success} = await localBackendService!.changeStar(public_order, pbk);
+        return {success};
+    }
+
+    const getDecryptedKnowledgeCarBytes = async (tempKeyPackCarBytes: Uint8Array) => {
+        const decryptedKnowledgeCarBytes = await localBackendService!.getDecryptedKnowledgeCarBytes(tempKeyPackCarBytes);
+        return decryptedKnowledgeCarBytes;
     }
 
     // 如果系统尚未初始化，显示加载中
@@ -135,6 +148,8 @@ const BackendProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           backendSetTempImgPack: setTempImgPack,
           backendDelTempImgPack: delTempImgPack,
           backendGetTempImgTempLinks: getTempImgTempLinks,
+          backendChangeStar: changeStar,
+          backendGetDecryptedKnowledgeCarBytes: getDecryptedKnowledgeCarBytes,
         }}
       >
         {children}

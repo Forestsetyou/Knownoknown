@@ -216,6 +216,7 @@ export const contractApi = {
         const decryptedNonce = Uint8Array.from(Encryption.decryptBytes(encryptedNonce, privateKey).bytes);
         return { decryptedKey, decryptedNonce };
     },
+    
     async simulateProofGenerate() {
         if (!(await this.getCompileStatus())) {
             await new Promise(resolve => setTimeout(resolve, 1000));

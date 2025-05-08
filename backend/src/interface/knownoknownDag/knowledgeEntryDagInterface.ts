@@ -214,6 +214,11 @@ type Intro_Interface = {
     image: CID // 简介的封面图片数据，索引地址只能是CID
 }
 
+interface Decryption_Keys {	// 混合加密密钥
+    free: Decryption_Key | null,	// 免费后才有的对称加密密钥, 可以为null
+    specialized: Record<User_Publickey, Mix_Decryption_Key>	// 每个公钥对应的混合密钥
+}
+
 interface Knowledge_Metadata {	// 'metadata' for knowledge
 	id: Knowledge_ID, // 知识ID, 现决定使用本知识的knowledge_data_cid的cid_str来标识该id
     public_order: Public_Order,	// 在整个知识档案中本知识的发布位序，即第几个发布，同时也是报告生成位序，决定其需要比较的指纹组数。
@@ -223,18 +228,14 @@ interface Knowledge_Metadata {	// 'metadata' for knowledge
     sales: number, // 发售量，购买该知识的用户数量
     sale_volume: number, // 发售容量，发售数量达到该容量后知识内容将被公开
     intro: Intro_Interface,
-    tags: Array<string> // 知识标签
-}
-
-interface Decryption_Keys {	// 混合加密密钥
-    free: Decryption_Key | null,	// 免费后才有的对称加密密钥, 可以为null
-    specialized: Record<User_Publickey, Mix_Decryption_Key>	// 每个公钥对应的混合密钥
+    tags: Array<string>, // 知识标签
+    decryption_keys: Decryption_Keys,	// 混合加密密钥
+    timestamp: number, // 知识发布时间
 }
 
 interface Knowledge_Entry {
 	metadata: CID,	// 包括knowledge intro, cid-> Metadata
     encrypted_car_knowledge_data: CID,	// 混合加密后的知识car数据, cid-> Encrypted_Car_Knowledge_Data
-    decryption_keys: Decryption_Keys,	// 混合加密密钥
 	fingerprint_data: CID, // 知识指纹数据, cid-> Fingerprint_Data
     check_report: CID,	// 知识的查重报告的CID, 生成报告后添加CID, 无报告的知识只能浏览简介, 无法被购买, 可以为null, cid-> Check_Report
 }
@@ -250,6 +251,12 @@ interface Temp_Image_Pack { // 临时图片包，用于渲染
     images: Record<string, CID>
 }
 
-export type { Knowledge_Entry, Knowledge_ID, Md_Data, Pure_Text_Fingerprint, Code_Section_Fingerprint, Image_Fingerprint, Knowledge_Metadata, Checkreport, Public_Order, Knowledge_Check_Pack, Knowledge_Chapter_Data, Code_Section_Data, Image_Data, Tmp_Image_Pack, Fingerprint_Data, Temp_Image_Pack};
+interface Temp_Key_Pack {
+    key: Uint8Array,
+    nonce: Uint8Array,
+    public_order: Public_Order,
+}
+
+export type { Knowledge_Entry, Knowledge_ID, Md_Data, Pure_Text_Fingerprint, Code_Section_Fingerprint, Image_Fingerprint, Knowledge_Metadata, Checkreport, Public_Order, Knowledge_Check_Pack, Knowledge_Chapter_Data, Code_Section_Data, Image_Data, Tmp_Image_Pack, Fingerprint_Data, Temp_Image_Pack, Decryption_Keys, Temp_Key_Pack};
 
 export { Custom_Link_Format, Code_Type, IMAGE_DATA_TYPE, Image_Link_Format_Regex, Code_Link_Format_Regex, Code_Section_Regex };

@@ -122,7 +122,7 @@ export class ExpressApp {
                 },
                 version: '1.0.0'
             })
-        })
+        });
         this.app.post('/admin/extract-fingerprint', 
             cors(adminServerCorsOptions),
             // 禁用 bodyParser 以直接处理二进制流
@@ -200,6 +200,51 @@ export class ExpressApp {
                 }
               }
             );
+            this.app.post('/admin/service/change-star', 
+                cors(adminServerCorsOptions),
+                async (req, res) => {
+                  try {
+                    const public_order = req.body.public_order;
+                    const pbk = req.body.pbk;
+                    const success = await this.knowledgeDB.changeStar(public_order, pbk);
+                    if (!success) {
+                        res.status(500).json({ success: false, error: 'change star failed' });
+                        return;
+                    }
+                    res.json({ success: true });
+                  } catch (error) {
+                    console.error("Processing error:", error);
+                    res.status(500).json({ success: false, error: error.message });
+                  }
+                }
+              );
+              
+            this.app.post('/admin/service/decrypt-knowledge', 
+                cors(adminServerCorsOptions),
+                // 禁用 bodyParser 以直接处理二进制流
+                express.raw({ type: 'application/octet-stream', limit: '500mb' }),
+                async (req, res) => {
+                try {
+                    if (!req.body || req.body.length === 0) {
+                    return res.status(400).json({ success: false, error: 'Empty payload' });
+                    }
+            
+                    // 直接获取 Uint8Array
+                    const tempKeyPackCarBytes = new Uint8Array(req.body);
+                    
+                    // 处理数据
+                    const decryptedKnowledgeDataCarBytes = await this.knowledgeDB.decryptKnowledgeByTempKeyPackCarBytes(tempKeyPackCarBytes);
+            
+                    // 返回二进制响应
+                    res.setHeader('Content-Type', 'application/octet-stream');
+                    res.end(Buffer.from(decryptedKnowledgeDataCarBytes));
+                } catch (error) {
+                    console.error("Processing error:", error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+                }
+            );
+              
             this.app.post('/admin/tempImg/set', 
                 cors(adminServerCorsOptions),
                 // 禁用 bodyParser 以直接处理二进制流
